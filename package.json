@@ -1,0 +1,30 @@
+{
+  "name": "vf",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "build:css": "node build-tailwind.js",
+    "watch:css": "nodemon --watch src/css --exec \"node build-tailwind.js\"",
+    "start:api": "node api/server.js",
+    "dev:api": "nodemon --watch api --exec \"node api/server.js\""
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.0.0",
+    "express": "^4.18.2",
+    "mysql2": "^3.15.3"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.1.17",
+    "autoprefixer": "^10.4.22",
+    "nodemon": "^3.1.10",
+    "postcss": "^8.5.6",
+    "tailwindcss": "^4.1.17"
+  },
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "main": "build-tailwind.js",
+  "keywords": [],
+  "type": "commonjs"
+}

@@ -1,0 +1,11 @@
+# .gitignore
+/vendor/
+/node_modules/
+.env
+*.log
+.DS_Store
+/.idea/
+/.vscode/
+uploads/
+config.php
+db/*.sql

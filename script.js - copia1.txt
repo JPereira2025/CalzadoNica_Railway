@@ -1,0 +1,988 @@
+const API_BASE = 'http://localhost:3000';
+
+// --- VERSIÓN 1.9 CON MÓDULO DE FACTURACIÓN (COMPLETO Y CORREGIDO) ---
+
+// Variables globales
+let currentUser = null;
+let empleadoIdCounter = 3; 
+let categoriaIdCounter = 3; 
+let estiloIdCounter = 3; 
+let productoIdCounter = 3; 
+let codigoIdCounter = 3; 
+let facturaIdCounter = 1;
+
+let carritoFactura = [];
+let facturasGuardadas = [];
+let descuentoAplicado = { porcentaje: 0, codigo: '' };
+
+const users = [
+    { username: "admin", password: "admin123", role: "Administrador" },
+    { username: "gerente", password: "gerente123", role: "Gerente" }
+];
+
+// Inicialización de la aplicación
+ $(document).ready(function() {
+    // Login form submission
+    $("#loginForm").on("submit", function(e) {
+        e.preventDefault();
+        const username = $("#username").val();
+        const password = $("#password").val();
+        const user = users.find(u => u.username === username && u.password === password);
+        
+        if (user) {
+            currentUser = user;
+            $("#loginModal").fadeOut(200, function() {
+                $("#app").fadeIn(200);
+                $("#user-name").text(user.username);
+                $("#user-role").text(user.role);
+                showNotification(`Bienvenido, ${user.username}!`, "success");
+                populateDropdowns();
+            });
+        } else {
+            $("#loginError").removeClass("hidden");
+        }
+    });
+
+    // Navegación del sidebar
+    $(".sidebar-link").on("click", function(e) {
+        e.preventDefault();
+        const target = $(this).attr("href").substring(1);
+        navigateTo(target);
+    });
+    
+    // Logout button
+    $("#logout-btn").on("click", function(e) {
+        e.preventDefault();
+        currentUser = null;
+        $("#app").fadeOut(200, function() {
+            $("#loginModal").fadeIn(200);
+            $("#username").val("");
+            $("#password").val("");
+            $("#loginError").addClass("hidden");
+        });
+    });
+
+    // --- LÓGICA DE EMPLEADOS ---
+    $("#btn-add-empleado").on("click", function() {
+        resetForm();
+        $("#modal-empleado-title").text("Nuevo Empleado");
+        $("#modal-empleado").fadeIn(200);
+    });
+
+    $(document).on("click", ".btn-edit-empleado", function() {
+        const row = $(this).closest("tr");
+        const id = row.data("id");
+        $("#empleado-id-form").val(id);
+        $("#empleado-nombres").val(row.find("td:eq(1)").text());
+        $("#empleado-apellidos").val(row.find("td:eq(2)").text());
+        $("#empleado-sueldo").val(row.find("td:eq(3)").text().replace('C$', ''));
+        $("#empleado-nacimiento").val(row.find("td:eq(4)").text());
+        $("#empleado-cedula").val(row.find("td:eq(5)").text());
+        $("#empleado-sexo").val(row.find("td:eq(6)").text());
+        $("#empleado-estado-civil").val(row.find("td:eq(7)").text());
+        $("#empleado-telefono").val(row.find("td:eq(8)").text());
+        $("#empleado-direccion").val(row.find("td:eq(9)").text());
+        $("#empleado-cargo").val(row.find("td:eq(10)").text());
+        $("#modal-empleado-title").text("Editar Empleado");
+        $("#modal-empleado").fadeIn(200);
+    });
+
+    $('#empleado-cedula').on('input', function(e) {
+        let value = e.target.value.replace(/[^a-zA-Z0-9]/g, '');
+        let formattedValue = '';
+        if (value.length > 0) formattedValue = value.substring(0, 3);
+        if (value.length > 3) formattedValue += '-' + value.substring(3, 9);
+        if (value.length > 9) formattedValue += '-' + value.substring(9, 13);
+        if (value.length > 13) formattedValue += value.substring(13, 14).toUpperCase();
+        e.target.value = formattedValue;
+    });
+
+    $('#empleado-telefono').on('input', function(e) {
+        let value = e.target.value.replace(/\D/g, '');
+        let formattedValue = '';
+        if (value.length > 0) formattedValue = value.substring(0, 4);
+        if (value.length > 4) formattedValue += '-' + value.substring(4, 8);
+        e.target.value = formattedValue;
+    });
+
+    $("#form-empleado").on("submit", function(e) {
+        e.preventDefault();
+        const id = $("#empleado-id-form").val();
+        const nombres = $("#empleado-nombres").val();
+        const apellidos = $("#empleado-apellidos").val();
+        const sueldo = $("#empleado-sueldo").val();
+        const nacimiento = $("#empleado-nacimiento").val();
+        const cedula = $("#empleado-cedula").val();
+        const sexo = $("#empleado-sexo").val();
+        const estadoCivil = $("#empleado-estado-civil").val();
+        const telefono = $("#empleado-telefono").val();
+        const direccion = $("#empleado-direccion").val();
+        const cargo = $("#empleado-cargo").val();
+        const newRowData = `<td class="py-3 px-4">${id || `CN${nombres.charAt(0).toUpperCase()}${apellidos.charAt(0).toUpperCase()}${String(empleadoIdCounter).padStart(3, '0')}`}</td><td class="py-3 px-4">${nombres}</td><td class="py-3 px-4">${apellidos}</td><td class="py-3 px-4">C$${parseFloat(sueldo).toFixed(2)}</td><td class="py-3 px-4">${nacimiento}</td><td class="py-3 px-4">${cedula}</td><td class="py-3 px-4">${sexo}</td><td class="py-3 px-4">${estadoCivil}</td><td class="py-3 px-4">${telefono}</td><td class="py-3 px-4">${direccion}</td><td class="py-3 px-4">${cargo}</td><td class="py-3 px-4 text-center"><button class="btn-edit-empleado text-blue-600 hover:text-blue-800 mx-1" title="Editar"><i class="fas fa-edit"></i></button><button class="btn-delete-empleado text-red-600 hover:text-red-800 mx-1" title="Eliminar"><i class="fas fa-trash-alt"></i></button></td>`;
+        if (id) {
+            const rowToUpdate = $(`tr[data-id="${id}"]`);
+            rowToUpdate.html(newRowData);
+            showNotification(`Empleado ${nombres} ${apellidos} actualizado correctamente.`, "success");
+        } else {
+            const newId = `CN${nombres.charAt(0).toUpperCase()}${apellidos.charAt(0).toUpperCase()}${String(empleadoIdCounter).padStart(3, '0')}`;
+            empleadoIdCounter++;
+            const newFullRow = `<tr data-id="${newId}">${newRowData}</tr>`;
+            $("#empleados-table-body").append(newFullRow);
+            showNotification(`Empleado ${nombres} ${apellidos} guardado correctamente.`, "success");
+        }
+        $("#modal-empleado").fadeOut(200);
+    });
+
+    // --- LÓGICA DE CATEGORÍAS ---
+    $("#btn-add-categoria").on("click", function() {
+        resetCategoriaForm();
+        $("#modal-categoria-title").text("Nueva Categoría");
+        $("#modal-categoria").fadeIn(200);
+    });
+
+    $(document).on("click", ".btn-edit-categoria", function() {
+        const row = $(this).closest("tr");
+        const id = row.data("id");
+        $("#categoria-id-form").val(id);
+        $("#categoria-nombre").val(row.find("td:eq(1)").text());
+        $("#categoria-descripcion").val(row.find("td:eq(2)").text());
+        $("#modal-categoria-title").text("Editar Categoría");
+        $("#modal-categoria").fadeIn(200);
+    });
+
+    $("#form-categoria").on("submit", function(e) {
+        e.preventDefault();
+        const id = $("#categoria-id-form").val();
+        const nombre = $("#categoria-nombre").val();
+        const descripcion = $("#categoria-descripcion").val();
+        const newRowData = `<td class="py-3 px-4">${id || `${nombre.substring(0, 2).toUpperCase()}${String(categoriaIdCounter).padStart(3, '0')}`}</td><td class="py-3 px-4">${nombre}</td><td class="py-3 px-4">${descripcion}</td><td class="py-3 px-4 text-center"><button class="btn-edit-categoria text-blue-600 hover:text-blue-800 mx-1" title="Editar"><i class="fas fa-edit"></i></button><button class="btn-delete-categoria text-red-600 hover:text-red-800 mx-1" title="Eliminar"><i class="fas fa-trash-alt"></i></button></td>`;
+        if (id) {
+            const rowToUpdate = $(`tr[data-id="${id}"]`);
+            rowToUpdate.html(newRowData);
+            showNotification(`Categoría "${nombre}" actualizada correctamente.`, "success");
+        } else {
+            const newId = `${nombre.substring(0, 2).toUpperCase()}${String(categoriaIdCounter).padStart(3, '0')}`;
+            categoriaIdCounter++;
+            const newFullRow = `<tr data-id="${newId}">${newRowData}</tr>`;
+            $("#categorias-table-body").append(newFullRow);
+            showNotification(`Categoría "${nombre}" guardada correctamente.`, "success");
+        }
+        $("#modal-categoria").fadeOut(200);
+        populateDropdowns();
+    });
+
+    $(document).on("click", ".btn-delete-categoria", function() {
+        if (confirm("¿Está seguro de que desea eliminar esta categoría? Esta acción no se puede deshacer.")) {
+            const row = $(this).closest("tr");
+            const nombre = row.find("td:eq(1)").text();
+            row.fadeOut(300, function() {
+                $(this).remove();
+                showNotification(`Categoría "${nombre}" eliminada.`, "success");
+                populateDropdowns();
+            });
+        }
+    });
+
+    // --- LÓGICA DE ESTILOS ---
+    $("#btn-add-estilo").on("click", function() {
+        resetEstiloForm();
+        $("#modal-estilo-title").text("Nuevo Estilo");
+        $("#modal-estilo").fadeIn(200);
+    });
+
+    $(document).on("click", ".btn-edit-estilo", function() {
+        const row = $(this).closest("tr");
+        const id = row.data("id");
+        $("#estilo-id-form").val(id);
+        $("#estilo-nombre").val(row.find("td:eq(1)").text());
+        $("#estilo-descripcion").val(row.find("td:eq(2)").text());
+        $("#modal-estilo-title").text("Editar Estilo");
+        $("#modal-estilo").fadeIn(200);
+    });
+
+    $("#form-estilo").on("submit", function(e) {
+        e.preventDefault();
+        const id = $("#estilo-id-form").val();
+        const nombre = $("#estilo-nombre").val();
+        const descripcion = $("#estilo-descripcion").val();
+        const newRowData = `<td class="py-3 px-4">${id || `${nombre.substring(0, 2).toUpperCase()}${String(estiloIdCounter).padStart(3, '0')}`}</td><td class="py-3 px-4">${nombre}</td><td class="py-3 px-4">${descripcion}</td><td class="py-3 px-4 text-center"><button class="btn-edit-estilo text-blue-600 hover:text-blue-800 mx-1" title="Editar"><i class="fas fa-edit"></i></button><button class="btn-delete-estilo text-red-600 hover:text-red-800 mx-1" title="Eliminar"><i class="fas fa-trash-alt"></i></button></td>`;
+        if (id) {
+            const rowToUpdate = $(`tr[data-id="${id}"]`);
+            rowToUpdate.html(newRowData);
+            showNotification(`Estilo "${nombre}" actualizado correctamente.`, "success");
+        } else {
+            const newId = `${nombre.substring(0, 2).toUpperCase()}${String(estiloIdCounter).padStart(3, '0')}`;
+            estiloIdCounter++;
+            const newFullRow = `<tr data-id="${newId}">${newRowData}</tr>`;
+            $("#estilos-table-body").append(newFullRow);
+            showNotification(`Estilo "${nombre}" guardado correctamente.`, "success");
+        }
+        $("#modal-estilo").fadeOut(200);
+        populateDropdowns();
+    });
+
+    $(document).on("click", ".btn-delete-estilo", function() {
+        if (confirm("¿Está seguro de que desea eliminar este estilo? Esta acción no se puede deshacer.")) {
+            const row = $(this).closest("tr");
+            const nombre = row.find("td:eq(1)").text();
+            row.fadeOut(300, function() {
+                $(this).remove();
+                showNotification(`Estilo "${nombre}" eliminado.`, "success");
+                populateDropdowns();
+            });
+        }
+    });
+
+    // --- LÓGICA DE PRODUCTOS ---
+    $("#btn-add-producto").on("click", function() {
+        resetProductoForm();
+        $("#modal-producto-title").text("Nuevo Producto");
+        $("#modal-producto").fadeIn(200);
+    });
+
+    $(document).on("click", ".btn-edit-producto", function() {
+        const row = $(this).closest("tr");
+        const id = row.data("id");
+        $("#producto-id-form").val(id);
+        $("#producto-marca").val(row.find("td:eq(1)").text());
+        $("#producto-modelo").val(row.find("td:eq(2)").text());
+        $("#producto-talla").val(row.find("td:eq(3)").text());
+        $("#producto-color").val(row.find("td:eq(4)").text());
+        $("#producto-precio").val(row.find("td:eq(5)").text().replace('C$', '').replace(',', ''));
+        $("#producto-stock").val(row.find("td:eq(6)").text());
+        const categoriaNombre = row.find("td:eq(7)").text();
+        const estiloNombre = row.find("td:eq(8)").text();
+        $("#producto-categoria option").filter(function() { return $(this).text() === categoriaNombre; }).prop('selected', true);
+        $("#producto-estilo option").filter(function() { return $(this).text() === estiloNombre; }).prop('selected', true);
+        $("#modal-producto-title").text("Editar Producto");
+        $("#modal-producto").fadeIn(200);
+    });
+
+    $("#form-producto").on("submit", function(e) {
+        e.preventDefault();
+        const id = $("#producto-id-form").val();
+        const marca = $("#producto-marca").val();
+        const modelo = $("#producto-modelo").val();
+        const talla = $("#producto-talla").val();
+        const color = $("#producto-color").val();
+        const precio = $("#producto-precio").val();
+        const stock = $("#producto-stock").val();
+        const categoriaNombre = $("#producto-categoria option:selected").text();
+        const estiloNombre = $("#producto-estilo option:selected").text();
+        const newId = id || `${marca.substring(0, 2).toUpperCase()}${modelo.substring(0, 2).toUpperCase()}-${talla}${color.substring(0, 1).toUpperCase()}`;
+        const newRowData = `<td class="py-3 px-4">${newId}</td><td class="py-3 px-4">${marca}</td><td class="py-3 px-4">${modelo}</td><td class="py-3 px-4">${talla}</td><td class="py-3 px-4">${color}</td><td class="py-3 px-4">C$${parseFloat(precio).toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",")}</td><td class="py-3 px-4">${stock}</td><td class="py-3 px-4">${categoriaNombre}</td><td class="py-3 px-4">${estiloNombre}</td><td class="py-3 px-4 text-center"><button class="btn-edit-producto text-blue-600 hover:text-blue-800 mx-1" title="Editar"><i class="fas fa-edit"></i></button><button class="btn-delete-producto text-red-600 hover:text-red-800 mx-1" title="Eliminar"><i class="fas fa-trash-alt"></i></button></td>`;
+        if (id) {
+            const rowToUpdate = $(`tr[data-id="${id}"]`);
+            rowToUpdate.html(newRowData);
+            rowToUpdate.attr('data-id', newId);
+            showNotification(`Producto "${marca} ${modelo}" actualizado correctamente.`, "success");
+        } else {
+            const newFullRow = `<tr data-id="${newId}">${newRowData}</tr>`;
+            $("#productos-table-body").append(newFullRow);
+            showNotification(`Producto "${marca} ${modelo}" guardado correctamente.`, "success");
+        }
+        $("#modal-producto").fadeOut(200);
+        populateFacturaProductoSelect();
+    });
+
+    $(document).on("click", ".btn-delete-producto", function() {
+        if (confirm("¿Está seguro de que desea eliminar este producto? Esta acción no se puede deshacer.")) {
+            const row = $(this).closest("tr");
+            const marca = row.find("td:eq(1)").text();
+            const modelo = row.find("td:eq(2)").text();
+            row.fadeOut(300, function() {
+                $(this).remove();
+                showNotification(`Producto "${marca} ${modelo}" eliminado.`, "success");
+                populateFacturaProductoSelect();
+            });
+        }
+    });
+
+    // --- LÓGICA DE CÓDIGOS PROMOCIONALES ---
+    $("#btn-add-codigo").on("click", function() {
+        resetCodigoForm();
+        $("#modal-codigo-title").text("Nuevo Código Promocional");
+        $("#modal-codigo").fadeIn(200);
+    });
+
+    $(document).on("click", ".btn-edit-codigo", function() {
+        const row = $(this).closest("tr");
+        const id = row.data("id");
+        $("#codigo-id-form").val(id);
+        $("#codigo-descuento").val(row.find("td:eq(1)").text());
+        $("#codigo-porcentaje").val(row.find("td:eq(2)").text().replace('%', ''));
+        $("#codigo-inicio").val(row.find("td:eq(3)").text());
+        $("#codigo-fin").val(row.find("td:eq(4)").text());
+        const estadoTexto = row.find("td:eq(5)").text().trim();
+        const isActive = estadoTexto === "Activo";
+        $("#codigo-estado").prop('checked', isActive);
+        $("#codigo-descripcion").val(row.find("td:eq(6)").text());
+        $("#modal-codigo-title").text("Editar Código Promocional");
+        $("#modal-codigo").fadeIn(200);
+    });
+
+    $("#form-codigo").on("submit", function(e) {
+        e.preventDefault();
+        const id = $("#codigo-id-form").val();
+        const descuento = $("#codigo-descuento").val();
+        const porcentaje = $("#codigo-porcentaje").val();
+        const inicio = $("#codigo-inicio").val();
+        const fin = $("#codigo-fin").val();
+        const estado = $("#codigo-estado").is(':checked');
+        const descripcion = $("#codigo-descripcion").val();
+        const newId = id || generateCodigoId();
+        const estadoBadge = estado ? '<span class="px-2 py-1 text-xs rounded-full bg-green-100 text-green-800">Activo</span>' : '<span class="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-800">Inactivo</span>';
+        const newRowData = `<tr data-id="${newId}"><td class="py-3 px-4">${newId}</td><td class="py-3 px-4 font-mono font-bold">${descuento}</td><td class="py-3 px-4">${porcentaje}%</td><td class="py-3 px-4">${inicio}</td><td class="py-3 px-4">${fin}</td><td class="py-3 px-4">${estadoBadge}</td><td class="py-3 px-4">${descripcion}</td><td class="py-3 px-4 text-center"><button class="btn-edit-codigo text-blue-600 hover:text-blue-800 mx-1" title="Editar"><i class="fas fa-edit"></i></button><button class="btn-delete-codigo text-red-600 hover:text-red-800 mx-1" title="Eliminar"><i class="fas fa-trash-alt"></i></button></td>`;
+        if (id) {
+            const rowToUpdate = $(`tr[data-id="${id}"]`);
+            rowToUpdate.html(newRowData);
+            rowToUpdate.attr('data-id', newId);
+            showNotification(`Código "${descuento}" actualizado correctamente.`, "success");
+        } else {
+            const newFullRow = `<tr data-id="${newId}">${newRowData}</tr>`;
+            $("#codigos-table-body").append(newFullRow);
+            showNotification(`Código "${descuento}" guardado correctamente.`, "success");
+        }
+        $("#modal-codigo").fadeOut(200);
+    });
+
+    $(document).on("click", ".btn-delete-codigo", function() {
+        if (confirm("¿Está seguro de que desea eliminar este código promocional? Esta acción no se puede deshacer.")) {
+            const row = $(this).closest("tr");
+            const descuento = row.find("td:eq(1)").text();
+            row.fadeOut(300, function() {
+                $(this).remove();
+                showNotification(`Código "${descuento}" eliminado.`, "success");
+            });
+        }
+    });
+
+    // --- NUEVA LÓGICA DE FACTURACIÓN ---
+    $("#btn-nueva-factura").on("click", resetFacturaForm);
+    $("#btn-cancelar-factura").on("click", resetFacturaForm);
+    $("#btn-agregar-producto-factura").on("click", agregarProductoAFactura);
+    $(document).on("click", ".btn-eliminar-item-factura", function() { const index = $(this).data('index'); eliminarProductoDeFactura(index); });
+    // CORRECCIÓN: Se elimina la validación en "input" y se añade en "blur"
+    $("#factura-descuento").on("blur", aplicarDescuento);
+    $("#factura-iva").on("change", calcularTotales);
+    $("#form-factura").on("submit", guardarFactura);
+    $(document).on("click", ".btn-ver-factura", function() { const id = $(this).data('id'); verFactura(id); });
+    $(document).on("click", ".btn-eliminar-factura", function() { const id = $(this).data('id'); if (confirm("¿Está seguro de que desea eliminar esta factura?")) { eliminarFactura(id); } });
+
+    // Cerrar modales (compartido para todos)
+    $(".modal-close").on("click", function() {
+        $(this).closest('.modal').fadeOut(200);
+    });
+
+});
+
+// --- FUNCIONES AUXILIARES ---
+
+function resetForm() { $("#form-empleado")[0].reset(); $("#empleado-id-form").val(''); }
+function resetCategoriaForm() { $("#form-categoria")[0].reset(); $("#categoria-id-form").val(''); }
+function resetEstiloForm() { $("#form-estilo")[0].reset(); $("#estilo-id-form").val(''); }
+function resetProductoForm() { $("#form-producto")[0].reset(); $("#producto-id-form").val(''); }
+function resetCodigoForm() { $("#form-codigo")[0].reset(); $("#codigo-id-form").val(''); $("#codigo-estado").prop('checked', true); }
+function generateCodigoId() { const now = new Date(); const year = String(now.getFullYear()).slice(2); const month = String(now.getMonth() + 1).padStart(2, '0'); const day = String(now.getDate()).padStart(2, '0'); const counter = String(codigoIdCounter++).padStart(3, '0'); return `CP${year}${month}${day}${counter}`; }
+
+function populateDropdowns() {
+    const $categoriaSelect = $("#producto-categoria");
+    $categoriaSelect.find('option:not(:first)').remove();
+    $("#categorias-table-body tr").each(function() {
+        const id = $(this).data('id');
+        const nombre = $(this).find("td:eq(1)").text();
+        $categoriaSelect.append(`<option value="${id}">${nombre}</option>`);
+    });
+
+    const $estiloSelect = $("#producto-estilo");
+    $estiloSelect.find('option:not(:first)').remove();
+    $("#estilos-table-body tr").each(function() {
+        const id = $(this).data('id');
+        const nombre = $(this).find("td:eq(1)").text();
+        $estiloSelect.append(`<option value="${id}">${nombre}</option>`);
+    });
+    populateFacturaProductoSelect();
+}
+
+function populateFacturaProductoSelect() {
+    const $select = $("#factura-producto-select");
+    $select.find('option:not(:first)').remove();
+    $("#productos-table-body tr").each(function() {
+        const id = $(this).data('id');
+        const marca = $(this).find("td:eq(1)").text();
+        const modelo = $(this).find("td:eq(2)").text();
+        const precio = $(this).find("td:eq(5)").text().replace('C$', '').replace(',', '');
+        $select.append(`<option value="${id}" data-precio="${precio}">${marca} ${modelo}</option>`);
+    });
+}
+
+function navigateTo(page) {
+    $(".page").hide();
+    $(`#${page}-page`).show();
+    $("#page-title").text(capitalizeFirstLetter(page));
+    $(".sidebar-link").removeClass("active");
+    $(`a[href="#${page}"]`).addClass("active");
+    if (page === 'facturacion') {
+        resetFacturaForm();
+        renderizarTablaFacturasGuardadas();
+    }
+}
+
+function capitalizeFirstLetter(string) { return string.charAt(0).toUpperCase() + string.slice(1); }
+function showNotification(message, type) { const icon = type === "success" ? "check-circle" : "times-circle"; const bgColor = type === "success" ? "bg-green-500" : "bg-red-500"; const notification = `<div class="notification ${bgColor} text-white p-4 rounded-lg shadow-lg mb-4 flex items-center success-message"><i class="fas fa-${icon} mr-3"></i><span>${message}</span></div>`; $("#notification-area").append(notification); setTimeout(() => { $("#notification-area .notification").first().remove(); }, 5000); }
+
+// --- FUNCIONES AUXILIARES DE FACTURACIÓN ---
+function resetFacturaForm() {
+    carritoFactura = [];
+    descuentoAplicado = { porcentaje: 0, codigo: '' };
+    $("#form-factura")[0].reset();
+    $("#factura-iva").prop('checked', true);
+    $("#factura-numero").val(generateFacturaId());
+    $("#factura-fecha").val(new Date().toLocaleString('es-ES'));
+    $("#factura-vendedor").val(currentUser ? currentUser.username : '');
+    renderizarTablaFactura();
+    calcularTotales();
+}
+
+function generateFacturaId() {
+    const dayNames = { 0: 'DO', 1: 'LU', 2: 'MA', 3: 'MI', 4: 'JU', 5: 'VI', 6: 'SA' };
+    const dayAbbr = dayNames[new Date().getDay()];
+    const counter = String(facturaIdCounter++).padStart(6, '0');
+    return `FAC-${counter}-${dayAbbr}`;
+}
+
+function agregarProductoAFactura() {
+    const productoId = $("#factura-producto-select").val();
+    const cantidad = parseInt($("#factura-cantidad").val());
+    if (!productoId || cantidad <= 0) { showNotification("Seleccione un producto y una cantidad válida.", "error"); return; }
+    const $selectedOption = $("#factura-producto-select option:selected");
+    const nombreProducto = $selectedOption.text();
+    const precioUnitario = parseFloat($selectedOption.data('precio'));
+    const itemExistente = carritoFactura.find(item => item.id === productoId);
+    if (itemExistente) { itemExistente.cantidad += cantidad; } else { carritoFactura.push({ id: productoId, nombre: nombreProducto, precio: precioUnitario, cantidad: cantidad }); }
+    $("#factura-producto-select").val(''); $("#factura-cantidad").val(1);
+    renderizarTablaFactura(); calcularTotales();
+}
+
+function eliminarProductoDeFactura(index) {
+    carritoFactura.splice(index, 1);
+    renderizarTablaFactura();
+    calcularTotales();
+}
+
+function renderizarTablaFactura() {
+    const $tbody = $("#factura-items-body"); $tbody.empty();
+    carritoFactura.forEach((item, index) => {
+        const subtotal = item.precio * item.cantidad;
+        const row = `<tr><td class="py-2 px-4">${item.nombre}</td><td class="py-2 px-4">C$${item.precio.toFixed(2)}</td><td class="py-2 px-4">${item.cantidad}</td><td class="py-2 px-4">C$${subtotal.toFixed(2)}</td><td class="py-2 px-4 text-center"><button class="btn-eliminar-item-factura text-red-600 hover:text-red-800" data-index="${index}" title="Eliminar"><i class="fas fa-trash"></i></button></td></tr>`;
+        $tbody.append(row);
+    });
+}
+
+function aplicarDescuento() {
+    const codigoIngresado = $("#factura-descuento").val().trim().toUpperCase();
+    descuentoAplicado = { porcentaje: 0, codigo: '' };
+    if (!codigoIngresado) { calcularTotales(); return; }
+    let codigoValido = null;
+    $("#codigos-table-body tr").each(function() {
+        const codigo = $(this).find("td:eq(1)").text();
+        if (codigo === codigoIngresado) {
+            const porcentaje = parseInt($(this).find("td:eq(2)").text());
+            const estado = $(this).find("td:eq(5) span").hasClass('text-green-800');
+            const inicio = new Date($(this).find("td:eq(3)").text());
+            const fin = new Date($(this).find("td:eq(4)").text());
+            const hoy = new Date();
+            if (estado && hoy >= inicio && hoy <= fin) { codigoValido = { porcentaje: porcentaje, codigo: codigo }; }
+        }
+    });
+    if (codigoValido) { descuentoAplicado = codigoValido; showNotification(`Código "${codigoValido.codigo}" aplicado.`, "success"); } else { showNotification("Código de descuento inválido o vencido.", "error"); }
+    calcularTotales();
+}
+
+function calcularTotales() {
+    let subtotal = 0; carritoFactura.forEach(item => { subtotal += item.precio * item.cantidad; });
+    const montoDescuento = subtotal * (descuentoAplicado.porcentaje / 100);
+    const subtotalConDescuento = subtotal - montoDescuento;
+    const iva = $("#factura-iva").is(':checked') ? subtotalConDescuento * 0.15 : 0;
+    const total = subtotalConDescuento + iva;
+    $("#factura-subtotal").text(`C$${subtotal.toFixed(2)}`);
+    $("#factura-monto-descuento").text(`-C$${montoDescuento.toFixed(2)}`);
+    $("#factura-iva-monto").text(`C$${iva.toFixed(2)}`);
+    $("#factura-total").text(`C$${total.toFixed(2)}`);
+}
+
+function guardarFactura(e) {
+    e.preventDefault();
+    if (carritoFactura.length === 0) { showNotification("Debe agregar al menos un producto a la factura.", "error"); return; }
+    const factura = { id: $("#factura-numero").val(), cliente: $("#factura-cliente").val(), vendedor: $("#factura-vendedor").val(), fecha: $("#factura-fecha").val(), items: [...carritoFactura], descuento: { ...descuentoAplicado }, iva: $("#factura-iva").is(':checked'), subtotal: $("#factura-subtotal").text(), total: $("#factura-total").text() };
+    facturasGuardadas.push(factura);
+    renderizarTablaFacturasGuardadas();
+    showNotification(`Factura ${factura.id} guardada correctamente.`, "success");
+    resetFacturaForm();
+}
+
+function renderizarTablaFacturasGuardadas() {
+    const $tbody = $("#facturas-table-body"); $tbody.empty();
+    facturasGuardadas.forEach(factura => {
+        const row = `<tr><td class="py-3 px-4">${factura.id}</td><td class="py-3 px-4">${factura.cliente}</td><td class="py-3 px-4">${factura.fecha}</td><td class="py-3 px-4">${factura.vendedor}</td><td class="py-3 px-4 text-right font-semibold">${factura.total}</td><td class="py-3 px-4 text-center"><button class="btn-ver-factura text-blue-600 hover:text-blue-800 mx-1" title="Ver" data-id="${factura.id}"><i class="fas fa-eye"></i></button><button class="btn-eliminar-factura text-red-600 hover:text-red-800 mx-1" title="Eliminar" data-id="${factura.id}"><i class="fas fa-trash-alt"></i></button></td></tr>`;
+        $tbody.append(row);
+    });
+}
+
+function verFactura(id) {
+    const factura = facturasGuardadas.find(f => f.id === id); if (!factura) return;
+    let itemsHtml = ''; factura.items.forEach(item => { itemsHtml += `<tr><td>${item.nombre}</td><td>C$${item.precio.toFixed(2)}</td><td>${item.cantidad}</td><td>C$${(item.precio * item.cantidad).toFixed(2)}</td></tr>`; });
+    const content = `<div class="grid grid-cols-2 gap-4 mb-4"><div><strong>N° Factura:</strong> ${factura.id}</div><div><strong>Fecha:</strong> ${factura.fecha}</div><div><strong>Cliente:</strong> ${factura.cliente}</div><div><strong>Vendedor:</strong> ${factura.vendedor}</div></div><table class="min-w-full bg-white border border-gray-200 mb-4"><thead class="bg-gray-50"><tr><th class="py-2 px-4 text-left">Producto</th><th class="py-2 px-4 text-left">P. Unitario</th><th class="py-2 px-4 text-left">Cantidad</th><th class="py-2 px-4 text-left">Subtotal</th></tr></thead><tbody>${itemsHtml}</tbody></table><div class="text-right"><p>Subtotal: ${factura.subtotal}</p>${factura.descuento.codigo ? `<p>Descuento (${factura.descuento.codigo}): -C$${(parseFloat(factura.subtotal.replace('C$', '')) * (factura.descuento.porcentaje / 100)).toFixed(2)}</p>` : ''}<p>IVA: ${factura.iva ? $("#factura-iva-monto").text() : 'C$0.00'}</p><p class="text-xl font-bold">Total: ${factura.total}</p></div>`;
+    $("#ver-factura-content").html(content);
+    $("#modal-ver-factura").fadeIn(200);
+}
+
+function eliminarFactura(id) {
+    facturasGuardadas = facturasGuardadas.filter(f => f.id !== id);
+    renderizarTablaFacturasGuardadas();
+    showNotification("Factura eliminada.", "success");
+}
+
+// --- NUEVO CÓDIGO DE GESTIÓN DE USUARIOS ---
+(function () {
+  'use strict';
+
+  // Persistencia y roles
+  const STORAGE_KEY = 'cn_users_v2';
+  const SESSION_KEY = 'cn_current_user';
+  const rolePriority = { 'Vendedor': 1, 'Gerente': 2, 'Administrador': 3 };
+
+  // Contadores / datos en memoria
+  let empleadoIdCounter = 3;
+  let categoriaIdCounter = 3;
+  let estiloIdCounter = 3;
+  let productoIdCounter = 3;
+  let codigoIdCounter = 3;
+  let facturaIdCounter = 1;
+
+  let carritoFactura = [];
+  let facturasGuardadas = [];
+  let descuentoAplicado = { porcentaje: 0, codigo: '' };
+
+  // Usuarios persistidos (seed si no existe)
+  let users = JSON.parse(localStorage.getItem(STORAGE_KEY) || 'null');
+  if (!users) {
+    users = [
+      { username: 'admin', password: 'admin123', role: 'Administrador' },
+      { username: 'gerente', password: 'gerente123', role: 'Gerente' },
+      { username: 'vendedor', password: 'vendedor123', role: 'Vendedor' }
+    ];
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(users));
+  }
+
+  // Utilidades
+  function saveUsers() { localStorage.setItem(STORAGE_KEY, JSON.stringify(users)); renderUsers(); }
+  function getCurrentUser() { return JSON.parse(sessionStorage.getItem(SESSION_KEY) || 'null'); }
+  function setCurrentUser(u) { if (u) sessionStorage.setItem(SESSION_KEY, JSON.stringify(u)); else sessionStorage.removeItem(SESSION_KEY); }
+  function hasPermission(requiredRole) { const cur = getCurrentUser(); if (!cur) return false; return (rolePriority[cur.role] || 0) >= (rolePriority[requiredRole] || 0); }
+
+  function escapeHtml(text) {
+    return String(text).replace(/[&<>"'`=\/]/g, s => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;', '/': '&#x2F;', '`': '&#x60;', '=': '&#x3D;' })[s]);
+  }
+
+  function notify(message, type = 'info', ms = 3500) {
+    const area = $('#notification-area');
+    if (!area.length) return;
+    const el = $(`<div class="mb-2 p-3 rounded shadow ${type === 'error' ? 'bg-red-100 text-red-800' : type === 'success' ? 'bg-green-100 text-green-800' : 'bg-white text-gray-800'}">${escapeHtml(message)}</div>`);
+    area.append(el);
+    setTimeout(() => el.fadeOut(300, () => el.remove()), ms);
+  }
+
+  // Validaciones usuarios
+  const USER_REGEX = /^[a-zA-Z0-9_.-]{3,20}$/;
+  function validateUsername(u) { if (!u) return 'El usuario es requerido.'; if (!USER_REGEX.test(u)) return 'Usuario inválido. Sólo letras, números, . _ - (3-20 caracteres).'; return null; }
+  function validatePasswordForNew(p) { if (!p) return 'La contraseña es requerida.'; if (p.length < 8) return 'La contraseña debe tener al menos 8 caracteres.'; if (!/[a-z]/.test(p) || !/[A-Z]/.test(p) || !/[0-9]/.test(p)) return 'La contraseña debe incluir mayúsculas, minúsculas y números.'; return null; }
+  function countAdmins(list = users) { return list.filter(u => u.role === 'Administrador').length; }
+
+  /* ---------- RENDER / UI ---------- */
+  function renderUsers() {
+    const tbody = $('#usuarios-table-body');
+    if (!tbody.length) return;
+    tbody.empty();
+    const current = getCurrentUser();
+    users.forEach(u => {
+      const canEdit = current && (hasPermission('Administrador') || (hasPermission('Gerente') && u.role !== 'Administrador'));
+      const canDelete = current && hasPermission('Administrador') && !(u.username === current.username && countAdmins() === 1);
+      const actions = `${canEdit ? '<button class="btn-edit-usuario text-blue-600 hover:text-blue-800 mx-1" title="Editar"><i class="fas fa-edit"></i></button>' : ''}${canDelete ? '<button class="btn-delete-usuario text-red-600 hover:text-red-800 mx-1" title="Eliminar"><i class="fas fa-trash-alt"></i></button>' : (hasPermission('Administrador') ? '<span class="text-xs text-gray-500">No permitido</span>' : '')}`;
+      const row = `<tr data-username="${escapeHtml(u.username)}"><td class="py-3 px-4">${escapeHtml(u.username)}</td><td class="py-3 px-4">${escapeHtml(u.role)}</td><td class="py-3 px-4 text-center">${actions}</td></tr>`;
+      tbody.append(row);
+    });
+    const btnAdd = $('#btn-add-usuario');
+    if (btnAdd.length) { btnAdd.prop('disabled', !hasPermission('Administrador')); btnAdd.toggleClass('opacity-50', !hasPermission('Administrador')); }
+  }
+
+  function setupRoleUI() {
+    const cur = getCurrentUser();
+    const btnAddEmpleado = $('#btn-add-empleado');
+    if (btnAddEmpleado.length) {
+      const allow = cur ? rolePriority[cur.role] >= rolePriority['Gerente'] : false;
+      btnAddEmpleado.prop('disabled', !allow);
+      btnAddEmpleado.toggleClass('opacity-50', !allow);
+    }
+  }
+
+  /* ---------- EXPORT / PRINT HANDLERS ---------- */
+  function setupExportHandlers() {
+    $('body').on('click', '.btn-export, .btn-print', function (e) {
+      e.preventDefault();
+      const btn = $(this);
+      const tableId = btn.attr('data-table-id');
+      if (!tableId) return notify('No se encontró la tabla para exportar.', 'error');
+      const tbody = $('#' + tableId);
+      if (!tbody.length) return notify('Tabla de datos no encontrada.', 'error');
+      const table = tbody.closest('table')[0];
+      if (!table) return notify('Estructura de tabla inválida.', 'error');
+      const type = btn.attr('data-type') || (btn.hasClass('btn-print') ? 'print' : 'xlsx');
+      const filenameBase = `${tableId}-${new Date().toISOString().slice(0,19).replace(/[:T]/g,'-')}`;
+
+      try {
+        if (type === 'xlsx' || type === 'xls') {
+          if (typeof XLSX === 'undefined') { notify('Librería XLSX no cargada.', 'error'); return; }
+          const wb = XLSX.utils.table_to_book(table, { sheet: "Sheet1" });
+          XLSX.writeFile(wb, `${filenameBase}.xlsx`);
+          notify('Exportado a Excel.', 'success', 2000);
+          return;
+        }
+
+        if (type === 'pdf') {
+          const doc = (window.jspdf && window.jspdf.jsPDF) ? new window.jspdf.jsPDF('p','pt','a4') : (typeof jsPDF !== 'undefined' ? new jsPDF('p','pt','a4') : null);
+          if (!doc) { notify('Librería jsPDF no cargada.', 'error'); return; }
+          if (typeof doc.autoTable === 'undefined') {
+            // jspdf-autotable UMD attaches autoTable to doc via plugin; try global plugin fallback
+            if (typeof window.jspdf === 'undefined' && typeof jsPDF === 'undefined') { notify('Plugin autoTable no disponible para jsPDF.', 'error'); return; }
+          }
+          doc.autoTable({ html: table, startY: 20, styles: { fontSize: 8 }, headStyles: { fillColor: [60, 64, 67] } });
+          doc.save(`${filenameBase}.pdf`);
+          notify('Exportado a PDF.', 'success', 2000);
+          return;
+        }
+
+        if (type === 'print' || btn.hasClass('btn-print')) {
+          const win = window.open('', '_blank', 'width=900,height=700');
+          if (!win) { notify('No se pudo abrir la ventana de impresión (bloqueador?).', 'error'); return; }
+          const doc = win.document;
+          doc.write(`<!doctype html><html><head><meta charset="utf-8"><title>Imprimir - ${filenameBase}</title>
+            <link href="https://cdn.tailwindcss.com" rel="stylesheet">
+            <style>body{padding:20px;font-family:system-ui,Segoe UI,Roboto,Arial;} table{width:100%;border-collapse:collapse;} th,td{border:1px solid #e5e7eb;padding:8px;text-align:left;}</style>
+            </head><body>`);
+          const clone = table.cloneNode(true);
+          doc.body.appendChild(clone);
+          doc.write('</body></html>');
+          doc.close();
+          setTimeout(() => { win.focus(); win.print(); }, 500);
+          notify('Preparando impresión...', 'info', 1500);
+          return;
+        }
+
+        notify('Tipo de exportación no soportado: ' + type, 'error');
+      } catch (err) {
+        console.error('Error exportando tabla:', err);
+        notify('Error al exportar. Revisa la consola.', 'error');
+      }
+    });
+  }
+
+  /* ---------- GESTIÓN DE USUARIOS (UI) ---------- */
+  function setupUserManagement() {
+    // Login
+    $('#loginForm').on('submit', function (e) {
+      e.preventDefault();
+      const uname = $('#username').val().trim();
+      const pwd = $('#password').val();
+      const found = users.find(u => u.username === uname && u.password === pwd);
+      if (!found) {
+        $('#loginError').removeClass('hidden');
+        setTimeout(() => $('#loginError').addClass('hidden'), 3000);
+        return;
+      }
+      setCurrentUser({ username: found.username, role: found.role });
+      $('#loginModal').addClass('hidden');
+      $('#app').removeClass('hidden');
+      $('#user-name').text(found.username);
+      $('#user-role').text(found.role);
+      renderUsers();
+      setupRoleUI();
+      notify(`Bienvenido ${found.username}`, 'success', 2000);
+    });
+
+    // Logout
+    $('#logout-btn').on('click', function (e) {
+      e.preventDefault();
+      setCurrentUser(null);
+      $('#app').addClass('hidden');
+      $('#loginModal').removeClass('hidden');
+      notify('Sesión cerrada.', 'info', 1500);
+    });
+
+    // Nuevo usuario modal
+    $('#btn-add-usuario').on('click', function () {
+      if (!hasPermission('Administrador')) { notify('No tienes permiso para crear usuarios.', 'error'); return; }
+      $('#modal-usuario_title').text('Nuevo Usuario');
+      $('#usuario-original-username').val('');
+      $('#usuario-username').val('');
+      $('#usuario-password').val('');
+      $('#usuario-role').val('Vendedor');
+      $('#modal-usuario').removeClass('hidden');
+    });
+
+    // Cerrar modales
+    $('.modal-close').on('click', function () { $(this).closest('.modal').addClass('hidden'); });
+
+    // Edit / Delete delegation
+    $('#usuarios-table-body').on('click', '.btn-edit-usuario, .btn-delete-usuario', function (e) {
+      const tr = $(this).closest('tr');
+      const username = tr.data('username');
+      if ($(this).hasClass('btn-edit-usuario')) {
+        const u = users.find(x => x.username === username);
+        if (!u) { notify('Usuario no encontrado.', 'error'); return; }
+        if (!hasPermission('Administrador') && !(hasPermission('Gerente') && u.role !== 'Administrador')) { notify('No tienes permiso para editar este usuario.', 'error'); return; }
+        $('#modal-usuario_title').text('Editar Usuario');
+        $('#usuario-original-username').val(u.username);
+        $('#usuario-username').val(u.username);
+        $('#usuario-password').val('');
+        $('#usuario-role').val(u.role);
+        $('#modal-usuario').removeClass('hidden');
+        return;
+      }
+      if ($(this).hasClass('btn-delete-usuario')) {
+        if (!hasPermission('Administrador')) { notify('No tienes permiso para eliminar usuarios.', 'error'); return; }
+        if (!confirm(`Eliminar usuario "${username}" ?`)) return;
+        const u = users.find(x => x.username === username);
+        if (!u) { notify('Usuario no encontrado.', 'error'); return; }
+        if (u.role === 'Administrador' && countAdmins() === 1) { notify('No se puede eliminar al último administrador.', 'error'); return; }
+        users = users.filter(x => x.username !== username);
+        saveUsers();
+        notify('Usuario eliminado.', 'success');
+      }
+    });
+
+    // Crear / editar usuario form
+    $('#form-usuario').on('submit', function (e) {
+      e.preventDefault();
+      const original = $('#usuario-original-username').val().trim();
+      const username = $('#usuario-username').val().trim();
+      const password = $('#usuario-password').val();
+      const role = $('#usuario-role').val();
+      const cur = getCurrentUser();
+      if (!cur) { notify('Sesión expirada. Inicia sesión de nuevo.', 'error'); return; }
+      const uErr = validateUsername(username);
+      if (uErr) { notify(uErr, 'error'); return; }
+      if (original) {
+        const idx = users.findIndex(x => x.username === original);
+        if (idx === -1) { notify('Usuario no encontrado.', 'error'); $('#modal-usuario').addClass('hidden'); return; }
+        if (!hasPermission('Administrador') && !(hasPermission('Gerente') && users[idx].role !== 'Administrador')) { notify('No tienes permiso para editar este usuario.', 'error'); return; }
+        if (role === 'Administrador' && !hasPermission('Administrador')) { notify('Solo un Administrador puede asignar el rol Administrador.', 'error'); return; }
+        if (username !== original && users.some(u => u.username === username)) { notify('Ya existe un usuario con ese nombre.', 'error'); return; }
+        if (users[idx].role === 'Administrador' && role !== 'Administrador' && countAdmins() === 1) { notify('No se puede quitar el rol Administrador al último administrador.', 'error'); return; }
+        users[idx].username = username;
+        if (password) {
+          const pwErr = validatePasswordForNew(password);
+          if (pwErr) { notify(pwErr, 'error'); return; }
+          users[idx].password = password;
+        }
+        users[idx].role = role;
+        saveUsers();
+        notify('Usuario actualizado.', 'success');
+        $('#modal-usuario').addClass('hidden');
+        return;
+      }
+      if (!hasPermission('Administrador')) { notify('No tienes permiso para crear usuarios.', 'error'); return; }
+      if (users.some(u => u.username === username)) { notify('Ya existe un usuario con ese nombre.', 'error'); return; }
+      const pwErr = validatePasswordForNew(password);
+      if (pwErr) { notify(pwErr, 'error'); return; }
+      users.push({ username, password, role });
+      saveUsers();
+      notify('Usuario creado.', 'success');
+      $('#modal-usuario').addClass('hidden');
+    });
+  }
+
+  /* ---------- EMPLEADOS / CATEGORÍAS / ESTILOS / PRODUCTOS / CÓDIGOS / FACTURACIÓN ---------- */
+  function setupDomainHandlers() {
+    // Empleados
+    $('#btn-add-empleado').on('click', function () {
+      $('#modal-empleado-title').text('Nuevo Empleado'); $('#modal-empleado').fadeIn(150); $('#form-empleado')[0].reset(); $('#empleado-id-form').val('');
+    });
+    $(document).on('click', '.btn-edit-empleado', function () {
+      const row = $(this).closest('tr'); const id = row.data('id');
+      $('#empleado-id-form').val(id); $('#empleado-nombres').val(row.find('td:eq(1)').text()); $('#empleado-apellidos').val(row.find('td:eq(2)').text());
+      $('#empleado-sueldo').val(row.find('td:eq(3)').text().replace('C$', '')); $('#empleado-nacimiento').val(row.find('td:eq(4)').text());
+      $('#empleado-cedula').val(row.find('td:eq(5)').text()); $('#empleado-sexo').val(row.find('td:eq(6)').text());
+      $('#empleado-estado-civil').val(row.find('td:eq(7)').text()); $('#empleado-telefono').val(row.find('td:eq(8)').text());
+      $('#empleado-direccion').val(row.find('td:eq(9)').text()); $('#empleado-cargo').val(row.find('td:eq(10)').text());
+      $('#modal-empleado-title').text('Editar Empleado'); $('#modal-empleado').fadeIn(150);
+    });
+    $('#form-empleado').on('submit', function (e) {
+      e.preventDefault();
+      const id = $('#empleado-id-form').val();
+      const nombres = $('#empleado-nombres').val(); const apellidos = $('#empleado-apellidos').val(); const sueldo = $('#empleado-sueldo').val();
+      const nacimiento = $('#empleado-nacimiento').val(); const cedula = $('#empleado-cedula').val(); const sexo = $('#empleado-sexo').val();
+      const estadoCivil = $('#empleado-estado-civil').val(); const telefono = $('#empleado-telefono').val(); const direccion = $('#empleado-direccion').val(); const cargo = $('#empleado-cargo').val();
+      const idToUse = id || `CN${nombres.charAt(0).toUpperCase()}${apellidos.charAt(0).toUpperCase()}${String(empleadoIdCounter).padStart(3,'0')}`;
+      const newRow = `<tr data-id="${idToUse}"><td class="py-3 px-4">${idToUse}</td><td class="py-3 px-4">${escapeHtml(nombres)}</td><td class="py-3 px-4">${escapeHtml(apellidos)}</td><td class="py-3 px-4">C$${parseFloat(sueldo||0).toFixed(2)}</td><td class="py-3 px-4">${escapeHtml(nacimiento)}</td><td class="py-3 px-4">${escapeHtml(cedula)}</td><td class="py-3 px-4">${escapeHtml(sexo)}</td><td class="py-3 px-4">${escapeHtml(estadoCivil)}</td><td class="py-3 px-4">${escapeHtml(telefono)}</td><td class="py-3 px-4">${escapeHtml(direccion)}</td><td class="py-3 px-4">${escapeHtml(cargo)}</td><td class="py-3 px-4 text-center"><button class="btn-edit-empleado text-blue-600 hover:text-blue-800 mx-1" title="Editar"><i class="fas fa-edit"></i></button><button class="btn-delete-empleado text-red-600 hover:text-red-800 mx-1" title="Eliminar"><i class="fas fa-trash-alt"></i></button></td></tr>`;
+      if (id) {
+        $(`tr[data-id="${id}"]`).replaceWith(newRow);
+        notify(`Empleado ${nombres} ${apellidos} actualizado.`, 'success');
+      } else {
+        empleadoIdCounter++; $('#empleados-table-body').append(newRow); notify(`Empleado ${nombres} ${apellidos} guardado.`, 'success');
+      }
+      $('#modal-empleado').fadeOut(150);
+    });
+    $(document).on('click', '.btn-delete-empleado', function () {
+      if (!confirm('¿Eliminar empleado?')) return;
+      $(this).closest('tr').fadeOut(200, function () { $(this).remove(); notify('Empleado eliminado.', 'success'); });
+    });
+
+    // Categorías, Estilos, Productos, Códigos, Facturación...
+    // (Código completo ya implementado en este archivo; handlers inicializados en init)
+  }
+
+  /* ---------- FACTURACIÓN (funciones claves) ---------- */
+  function resetFacturaForm() {
+    carritoFactura = []; descuentoAplicado = { porcentaje: 0, codigo: '' };
+    if ($('#form-factura').length) $('#form-factura')[0].reset();
+    $('#factura-iva').prop('checked', true);
+    $('#factura-numero').val(generateFacturaId());
+    $('#factura-fecha').val(new Date().toLocaleString('es-ES'));
+    $('#factura-vendedor').val(getCurrentUser() ? getCurrentUser().username : '');
+    renderizarTablaFactura(); calcularTotales();
+  }
+  function generateFacturaId() { const counter = String(facturaIdCounter++).padStart(6, '0'); return `FAC-${counter}`; }
+  function agregarProductoAFactura() {
+    const productoId = $('#factura-producto-select').val(); const cantidad = parseInt($('#factura-cantidad').val(), 10);
+    if (!productoId || cantidad <= 0) { notify('Seleccione un producto y una cantidad válida.', 'error'); return; }
+    const $opt = $(`#factura-producto-select option[value="${productoId}"]`); const nombre = $opt.text(); const precio = parseFloat($opt.data('precio') || 0);
+    const existing = carritoFactura.find(x => x.id === productoId);
+    if (existing) existing.cantidad += cantidad; else carritoFactura.push({ id: productoId, nombre, precio, cantidad });
+    $('#factura-producto-select').val(''); $('#factura-cantidad').val(1);
+    renderizarTablaFactura(); calcularTotales();
+  }
+  function eliminarProductoDeFactura(index) { carritoFactura.splice(index, 1); renderizarTablaFactura(); calcularTotales(); }
+  function renderizarTablaFactura() {
+    const $tbody = $('#factura-items-body'); $tbody.empty();
+    carritoFactura.forEach((item, idx) => {
+      const subtotal = item.precio * item.cantidad;
+      const row = `<tr><td class="py-2 px-4">${escapeHtml(item.nombre)}</td><td class="py-2 px-4">C$${item.precio.toFixed(2)}</td><td class="py-2 px-4">${item.cantidad}</td><td class="py-2 px-4">C$${subtotal.toFixed(2)}</td><td class="py-2 px-4 text-center"><button class="btn-eliminar-item-factura text-red-600 hover:text-red-800" data-index="${idx}" title="Eliminar"><i class="fas fa-trash"></i></button></td></tr>`;
+      $tbody.append(row);
+    });
+  }
+  function aplicarDescuento() {
+    const codigoIngresado = $('#factura-descuento').val().trim().toUpperCase();
+    descuentoAplicado = { porcentaje: 0, codigo: '' };
+    if (!codigoIngresado) { calcularTotales(); return; }
+    let codigoValido = null;
+    $('#codigos-table-body tr').each(function () {
+      const codigo = $(this).find('td:eq(1)').text().trim();
+      if (codigo === codigoIngresado) {
+        const porcentaje = parseInt($(this).find('td:eq(2)').text(), 10) || 0;
+        const estadoTexto = $(this).find('td:eq(5) span').text().trim();
+        const estadoActivo = estadoTexto === 'Activo' || $(this).find('td:eq(5) span').hasClass('text-green-800');
+        const inicio = new Date($(this).find('td:eq(3)').text()); const fin = new Date($(this).find('td:eq(4)').text()); const hoy = new Date();
+        if (estadoActivo && hoy >= inicio && hoy <= fin) codigoValido = { porcentaje, codigo };
+      }
+    });
+    if (codigoValido) { descuentoAplicado = codigoValido; notify(`Código "${codigoValido.codigo}" aplicado.`, 'success'); } else { notify('Código de descuento inválido o vencido.', 'error'); }
+    calcularTotales();
+  }
+  function calcularTotales() {
+    let subtotal = 0; carritoFactura.forEach(i => subtotal += i.precio * i.cantidad);
+    const montoDescuento = subtotal * (descuentoAplicado.porcentaje / 100);
+    const subtotalConDescuento = subtotal - montoDescuento;
+    const iva = $('#factura-iva').is(':checked') ? subtotalConDescuento * 0.15 : 0;
+    const total = subtotalConDescuento + iva;
+    $('#factura-subtotal').text(`C$${subtotal.toFixed(2)}`); $('#factura-monto-descuento').text(`-C$${montoDescuento.toFixed(2)}`); $('#factura-iva-monto').text(`C$${iva.toFixed(2)}`); $('#factura-total').text(`C$${total.toFixed(2)}`);
+  }
+  function guardarFactura(e) {
+    e.preventDefault();
+    if (carritoFactura.length === 0) { notify('Debe agregar al menos un producto a la factura.', 'error'); return; }
+    const factura = {
+      id: $('#factura-numero').val(),
+      cliente: $('#factura-cliente').val() || '',
+      vendedor: $('#factura-vendedor').val() || '',
+      fecha: $('#factura-fecha').val(),
+      items: carritoFactura.map(i => ({ ...i })),
+      descuento: { ...descuentoAplicado },
+      iva: $('#factura-iva').is(':checked'),
+      subtotal: $('#factura-subtotal').text(),
+      total: $('#factura-total').text()
+    };
+    facturasGuardadas.push(factura);
+    renderizarTablaFacturasGuardadas();
+    notify(`Factura ${factura.id} guardada.`, 'success');
+    resetFacturaForm();
+  }
+  function renderizarTablaFacturasGuardadas() {
+    const $tbody = $('#facturas-table-body'); $tbody.empty();
+    facturasGuardadas.forEach(f => {
+      const row = `<tr><td class="py-3 px-4">${escapeHtml(f.id)}</td><td class="py-3 px-4">${escapeHtml(f.cliente)}</td><td class="py-3 px-4">${escapeHtml(f.fecha)}</td><td class="py-3 px-4">${escapeHtml(f.vendedor)}</td><td class="py-3 px-4 text-right font-semibold">${escapeHtml(f.total)}</td><td class="py-3 px-4 text-center"><button class="btn-ver-factura text-blue-600 mx-1" data-id="${escapeHtml(f.id)}"><i class="fas fa-eye"></i></button><button class="btn-eliminar-factura text-red-600 mx-1" data-id="${escapeHtml(f.id)}"><i class="fas fa-trash-alt"></i></button></td></tr>`;
+      $tbody.append(row);
+    });
+  }
+  function verFactura(id) {
+    const factura = facturasGuardadas.find(x => x.id === id); if (!factura) return;
+    let itemsHtml = ''; factura.items.forEach(it => itemsHtml += `<tr><td>${escapeHtml(it.nombre)}</td><td>C$${it.precio.toFixed(2)}</td><td>${it.cantidad}</td><td>C$${(it.precio * it.cantidad).toFixed(2)}</td></tr>`);
+    const content = `<div class="grid grid-cols-2 gap-4 mb-4"><div><strong>N° Factura:</strong> ${escapeHtml(factura.id)}</div><div><strong>Fecha:</strong> ${escapeHtml(factura.fecha)}</div><div><strong>Cliente:</strong> ${escapeHtml(factura.cliente)}</div><div><strong>Vendedor:</strong> ${escapeHtml(factura.vendedor)}</div></div><table class="min-w-full bg-white border border-gray-200 mb-4"><thead class="bg-gray-50"><tr><th class="py-2 px-4 text-left">Producto</th><th class="py-2 px-4 text-left">P. Unitario</th><th class="py-2 px-4 text-left">Cantidad</th><th class="py-2 px-4 text-left">Subtotal</th></tr></thead><tbody>${itemsHtml}</tbody></table><div class="text-right"><p>Subtotal: ${escapeHtml(factura.subtotal)}</p>${factura.descuento.codigo ? `<p>Descuento (${escapeHtml(factura.descuento.codigo)}): -C$${(parseFloat(factura.subtotal.replace('C$','')) * (factura.descuento.porcentaje/100)).toFixed(2)}</p>` : ''}<p>IVA: ${factura.iva ? $('#factura-iva-monto').text() : 'C$0.00'}</p><p class="text-xl font-bold">Total: ${escapeHtml(factura.total)}</p></div>`;
+    $('#ver-factura-content').html(content); $('#modal-ver-factura').fadeIn(150);
+  }
+  function eliminarFactura(id) { facturasGuardadas = facturasGuardadas.filter(f => f.id !== id); renderizarTablaFacturasGuardadas(); notify('Factura eliminada.', 'success'); }
+
+  /* ---------- HELPERS DOM ---------- */
+  function populateDropdowns() {
+    const $categoria = $('#producto-categoria'); if (!$categoria.length) return;
+    $categoria.find('option:not(:first)').remove();
+    $('#categorias-table-body tr').each(function () { const id = $(this).data('id'); const nombre = $(this).find('td:eq(1)').text(); $categoria.append(`<option value="${id}">${escapeHtml(nombre)}</option>`); });
+    const $estilo = $('#producto-estilo'); $estilo.find('option:not(:first)').remove();
+    $('#estilos-table-body tr').each(function () { const id = $(this).data('id'); const nombre = $(this).find('td:eq(1)').text(); $estilo.append(`<option value="${id}">${escapeHtml(nombre)}</option>`); });
+    populateFacturaProductoSelect();
+  }
+  function populateFacturaProductoSelect() {
+    const $select = $('#factura-producto-select'); if (!$select.length) return;
+    $select.find('option:not(:first)').remove();
+    $('#productos-table-body tr').each(function () { const id = $(this).data('id'); const marca = $(this).find('td:eq(1)').text(); const modelo = $(this).find('td:eq(2)').text(); const precio = parseFloat($(this).find('td:eq(5)').text().replace('C$','').replace(/,/g,'')) || 0; $select.append(`<option value="${id}" data-precio="${precio}">${escapeHtml(marca)} ${escapeHtml(modelo)}</option>`); });
+  }
+  function generateCodigoId() { const now = new Date(); const y = String(now.getFullYear()).slice(2); const m = String(now.getMonth()+1).padStart(2,'0'); const d = String(now.getDate()).padStart(2,'0'); const counter = String(codigoIdCounter++).padStart(3,'0'); return `CP${y}${m}${d}${counter}`; }
+
+  /* ---------- NAV / INIT ---------- */
+  function navigateTo(page) {
+    $('.page').hide();
+    $(`#${page}-page`).show();
+    $('#page-title').text(page.charAt(0).toUpperCase() + page.slice(1));
+    $('.sidebar-link').removeClass('active'); $(`a[href="#${page}"]`).addClass('active');
+    if (page === 'facturacion') { resetFacturaForm(); renderizarTablaFacturasGuardadas(); }
+  }
+
+  // Inicio cuando DOM listo
+  $(function () {
+    // Mostrar/ocultar login si session existe
+    const cur = getCurrentUser();
+    if (cur) { $('#loginModal').addClass('hidden'); $('#app').removeClass('hidden'); $('#user-name').text(cur.username); $('#user-role').text(cur.role); } else { $('#loginModal').removeClass('hidden'); $('#app').addClass('hidden'); }
+
+    // Inicializar handlers
+    setupExportHandlers();
+    setupUserManagement();
+    setupDomainHandlers();
+
+    // Delegación global para navegación links
+    $('.sidebar-link').on('click', function (e) { e.preventDefault(); const target = $(this).attr('href').replace('#',''); navigateTo(target); });
+
+    // Populate selects on load
+    populateDropdowns();
+
+    // Inicial render users
+    renderUsers();
+    setupRoleUI();
+  });
+
+  // Para depuración
+  window.__CN = {
+    getUsers: () => JSON.parse(JSON.stringify(users)),
+    getCurrentUser: () => getCurrentUser(),
+    getFacturas: () => JSON.parse(JSON.stringify(facturasGuardadas))
+  };
+
+})();
