@@ -1,159 +1,161 @@
 <?php
-// endpoints/facturas.php
-require_once 'db.php';
+require_once __DIR__ . '/db.php';
+
+header('Content-Type: application/json; charset=utf-8');
+header('Access-Control-Allow-Origin: *');
+header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
+header('Access-Control-Allow-Headers: Content-Type, Authorization');
+
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    http_response_code(200);
+    echo json_encode(['success' => true]);
+    exit;
+}
+
+function jsonErr($msg, $code = 500) {
+    http_response_code($code);
+    echo json_encode(['success' => false, 'message' => $msg]);
+    exit;
+}
+
+function parseCurrency($text) {
+    if ($text === null) return 0;
+    $num = preg_replace('/[^\d\.\-]/u','', (string)$text);
+    return is_numeric($num) ? floatval($num) : 0;
+}
+
+function existsProducto($conn, $id) {
+    $stmt = $conn->prepare("SELECT id FROM productos WHERE id = ? LIMIT 1");
+    $stmt->bind_param('s', $id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    return ($result && $result->num_rows > 0);
+}
+
+ $method = $_SERVER['REQUEST_METHOD'];
+ $tableName = 'facturas';
+
+// Obtener columnas de la tabla para construir consultas dinámicas
+ $colsRes = $conn->query("SHOW COLUMNS FROM `{$tableName}`");
+if (!$colsRes) jsonErr("Error DB: " . $conn->error);
+ $cols = [];
+ $pk = null;
+ $pkAuto = false;
+while ($r = $colsRes->fetch_assoc()) {
+    $cols[] = $r['Field'];
+    if ($r['Key'] === 'PRI') {
+        $pk = $r['Field'];
+        if (stripos($r['Extra'], 'auto_increment') !== false) $pkAuto = true;
+    }
+}
+
 switch ($method) {
     case 'GET':
-        if (isset($_GET['id'])) {
-            $id = $conn->real_escape_string($_GET['id']);
-            
-            // Obtener factura
-            $sql = "SELECT * FROM facturas WHERE id='$id'";
-            $result = $conn->query($sql);
-            
-            if ($result->num_rows > 0) {
+        $id = isset($_GET['id']) ? $_GET['id'] : null;
+        try {
+            if ($id) {
+                $stmt = $conn->prepare("SELECT * FROM facturas WHERE id = ?");
+                $stmt->bind_param('s', $id);
+                $stmt->execute();
+                $result = $stmt->get_result();
                 $factura = $result->fetch_assoc();
                 
-                // Obtener items de la factura
-                $sql_items = "SELECT * FROM factura_items WHERE factura_id='$id'";
-                $result_items = $conn->query($sql_items);
-                $items = [];
-                
-                if ($result_items->num_rows > 0) {
-                    while($row = $result_items->fetch_assoc()) {
-                        $items[] = $row;
-                    }
+                if ($factura) {
+                    // Obtener los ítems de la factura
+                    $itemStmt = $conn->prepare("SELECT id_producto, nombre_producto, cantidad, precio_unitario FROM factura_items WHERE id_factura = ?");
+                    $itemStmt->bind_param('s', $id);
+                    $itemStmt->execute();
+                    $itemResult = $itemStmt->get_result();
+                    $factura['items'] = $itemResult->fetch_all(MYSQLI_ASSOC);
                 }
                 
-                $factura['items'] = $items;
-                echo json_encode($factura);
+                echo json_encode($factura ?: []);
             } else {
-                http_response_code(404);
-                echo json_encode(['message' => 'Factura no encontrada']);
+                $stmt = $conn->prepare("SELECT * FROM facturas ORDER BY id DESC");
+                $stmt->execute();
+                $result = $stmt->get_result();
+                $facturas = $result->fetch_all(MYSQLI_ASSOC);
+                echo json_encode($facturas);
             }
-        } else {
-            // Obtener todas las facturas
-            $sql = "SELECT * FROM facturas ORDER BY created_at DESC";
-            $result = $conn->query($sql);
-            $facturas = [];
-            
-            if ($result->num_rows > 0) {
-                while($row = $result->fetch_assoc()) {
-                    $facturas[] = $row;
-                }
-            }
-            
-            echo json_encode($facturas);
+        } catch (Exception $e) {
+            jsonErr('Error al obtener facturas: ' . $e->getMessage());
         }
         break;
-        
+
     case 'POST':
         $data = json_decode(file_get_contents('php://input'), true);
-        
-        $id = $conn->real_escape_string($data['id']);
-        $cliente = $conn->real_escape_string($data['cliente']);
-        $vendedor = $conn->real_escape_string($data['vendedor']);
-        $fecha = $conn->real_escape_string($data['fecha']);
-        $subtotal = $conn->real_escape_string($data['subtotal']);
-        $monto_descuento = $conn->real_escape_string($data['monto_descuento']);
-        $iva = $conn->real_escape_string($data['iva']);
-        $total = $conn->real_escape_string($data['total']);
-        $codigo_descuento = isset($data['codigo_descuento']) ? $conn->real_escape_string($data['codigo_descuento']) : NULL;
-        
-        // Iniciar transacción
+        if (!is_array($data) || empty($data['cliente'])) {
+            jsonErr('Faltan datos requeridos (cliente).', 400);
+        }
+
         $conn->begin_transaction();
-        
         try {
-            // Insertar factura
-            $sql = "INSERT INTO facturas (id, cliente, vendedor, fecha, subtotal, monto_descuento, iva, total, codigo_descuento) 
-                    VALUES ('$id', '$cliente', '$vendedor', '$fecha', $subtotal, $monto_descuento, $iva, $total, '$codigo_descuento')";
+           
+            // Insertar la factura principal
+            $stmt = $conn->prepare("INSERT INTO facturas (id, cliente, vendedor, fecha, subtotal, monto_descuento, iva, total, codigo_descuento) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
             
-            if (!$conn->query($sql)) {
-                throw new Exception("Error al crear factura: " . $conn->error);
-            }
+            $cliente = $data['cliente'];
+            $vendedor = $data['vendedor'] ?? '';
+            $fecha = $data['fecha'] ?? date('Y-m-d H:i:s');
+            $subtotal = parseCurrency($data['subtotal'] ?? 0);
+            $monto_descuento = parseCurrency($data['monto_descuento'] ?? 0);
+            $iva = parseCurrency($data['iva'] ?? 0);
+            $total = parseCurrency($data['total'] ?? 0);
+            $codigo_descuento = $data['descuento_codigo'] ?? null;
+
+            $factura_id = $data['id'] ?? null;
+            if (!$factura_id) throw new Exception('ID de factura no proporcionado desde el cliente.');
+            $stmt->bind_param('ssssdddds', $factura_id, $cliente, $vendedor, $fecha, $subtotal, $monto_descuento, $iva, $total, $codigo_descuento);
             
-            // Insertar items de la factura
-            if (isset($data['items']) && is_array($data['items'])) {
-                foreach ($data['items'] as $item) {
-                    $producto_id = $conn->real_escape_string($item['id']);
-                    $nombre_producto = $conn->real_escape_string($item['nombre']);
-                    $precio_unitario = $conn->real_escape_string($item['precio']);
-                    $cantidad = $conn->real_escape_string($item['cantidad']);
-                    $subtotal_item = $conn->real_escape_string($item['precio'] * $item['cantidad']);
-                    
-                    $sql_item = "INSERT INTO factura_items (factura_id, producto_id, nombre_producto, precio_unitario, cantidad, subtotal) 
-                                VALUES ('$id', '$producto_id', '$nombre_producto', $precio_unitario, $cantidad, $subtotal_item)";
-                    
-                    if (!$conn->query($sql_item)) {
-                        throw new Exception("Error al insertar item: " . $conn->error);
-                    }
-                    
-                    // Actualizar stock del producto
-                    $sql_update_stock = "UPDATE productos SET stock = stock - $cantidad WHERE id = '$producto_id'";
-                    if (!$conn->query($sql_update_stock)) {
-                        throw new Exception("Error al actualizar stock: " . $conn->error);
+            if ($stmt->execute()) {
+                // $factura_id ya está definido arriba con el ID enviado por el cliente
+
+                // Insertar los items de la factura
+                if (!empty($data['items']) && is_array($data['items'])) {
+                    $itemStmt = $conn->prepare("INSERT INTO factura_items (id_factura, id_producto, nombre_producto, cantidad, precio_unitario) VALUES (?, ?, ?, ?, ?)");
+                    foreach ($data['items'] as $item) {
+                        $id_producto = $item['id'] ?? null;
+                        $nombre_producto = $item['nombre'] ?? '';
+                        $cantidad = intval($item['cantidad'] ?? 0);
+                        $precio_unitario = floatval($item['precio'] ?? 0);
+                        
+                        $itemStmt->bind_param('ssssi', $factura_id, $id_producto, $nombre_producto, $cantidad, $precio_unitario);
+                        $itemStmt->execute();
                     }
                 }
+
+                $conn->commit();
+                echo json_encode(['success' => true, 'message' => 'Factura creada', 'id' => $factura_id]);
+            } else {
+                throw new Exception('Error al crear factura: ' . $stmt->error);
             }
-            
-            // Confirmar transacción
-            $conn->commit();
-            echo json_encode(['success' => true, 'message' => 'Factura creada correctamente']);
         } catch (Exception $e) {
-            // Revertir transacción
             $conn->rollback();
-            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+            jsonErr('Error al guardar factura: ' . $e->getMessage());
         }
         break;
-        
+
     case 'DELETE':
-        $id = $conn->real_escape_string($_GET['id']);
-        
-        // Iniciar transacción
-        $conn->begin_transaction();
+        $id = $_GET['id'] ?? null;
+        if (!$id) jsonErr('ID no proporcionado', 400);
         
         try {
-            // Obtener items de la factura para devolver stock
-            $sql_items = "SELECT * FROM factura_items WHERE factura_id='$id'";
-            $result_items = $conn->query($sql_items);
-            
-            if ($result_items->num_rows > 0) {
-                while($row = $result_items->fetch_assoc()) {
-                    $producto_id = $row['producto_id'];
-                    $cantidad = $row['cantidad'];
-                    
-                    // Devolver stock al producto
-                    $sql_update_stock = "UPDATE productos SET stock = stock + $cantidad WHERE id = '$producto_id'";
-                    if (!$conn->query($sql_update_stock)) {
-                        throw new Exception("Error al devolver stock: " . $conn->error);
-                    }
-                }
+            $stmt = $conn->prepare("DELETE FROM facturas WHERE id = ?");
+            $stmt->bind_param('s', $id);
+            if ($stmt->execute()) {
+                echo json_encode(['success' => true, 'message' => 'Factura eliminada correctamente']);
+            } else {
+                jsonErr('Error al eliminar factura: ' . $stmt->error);
             }
-            
-            // Eliminar items de la factura
-            $sql_delete_items = "DELETE FROM factura_items WHERE factura_id='$id'";
-            if (!$conn->query($sql_delete_items)) {
-                throw new Exception("Error al eliminar items: " . $conn->error);
-            }
-            
-            // Eliminar factura
-            $sql = "DELETE FROM facturas WHERE id='$id'";
-            if (!$conn->query($sql)) {
-                throw new Exception("Error al eliminar factura: " . $conn->error);
-            }
-            
-            // Confirmar transacción
-            $conn->commit();
-            echo json_encode(['success' => true, 'message' => 'Factura eliminada correctamente']);
         } catch (Exception $e) {
-            // Revertir transacción
-            $conn->rollback();
-            echo json_encode(['success' => false, 'message' => $e->getMessage()]);
+            jsonErr('Error al eliminar factura: ' . $e->getMessage());
         }
         break;
-        
+
     default:
         http_response_code(405);
-        echo json_encode(['message' => 'Método no permitido']);
-        break;
+        echo json_encode(['success' => false, 'message' => 'Método no permitido']);
 }
+
+ $conn->close();
 ?>

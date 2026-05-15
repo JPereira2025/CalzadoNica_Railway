@@ -131,18 +131,36 @@ function handleNavigation(e) {
 }
 
 function navigateTo(page) {
+    if (!page) page = 'dashboard';
+    page = String(page).replace(/^#/, '');
     $(".page").hide();
     $(`#${page}-page`).show();
     $("#page-title").text(capitalizeFirstLetter(page));
     $(".sidebar-link").removeClass("active");
     $(`a[href="#${page}"]`).addClass("active");
-    
+
     if (page === 'facturacion') {
-        resetFacturaForm();
-        loadFacturas();
+        // IMPORTANTE: Cargar los productos ANTES de resetear el formulario
+        loadProductos().then(() => {
+            resetFacturaForm();
+            loadFacturas();
+        });
     } else if (page === 'dashboard') {
         loadDashboardStats();
+    } else if (page === 'empleados') {
+        loadEmpleados();
+    } else if (page === 'categorias') {
+        loadCategorias();
+    } else if (page === 'estilos') {
+        loadEstilos();
+    } else if (page === 'productos') {
+        loadProductos();
+    } else if (page === 'codigos') {
+        loadCodigos();
+    } else if (page === 'usuarios') {
+        loadUsuarios();
     }
+
 }
 
 // --- FUNCIONES AUXILIARES ---

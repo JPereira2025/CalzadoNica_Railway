@@ -128,4 +128,3 @@ switch ($method) {
         echo json_encode(['success' => false, 'message' => 'Method Not Allowed']);
         break;
 }
-?>

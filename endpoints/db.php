@@ -1,20 +1,29 @@
 <?php
-// endpoints/db.php
+// ¡NI UN ESPACIO ANTES DE ESTA LÍNEA!
 
-// Configuración de conexión
-define('DB_HOST', '127.0.0.1');   // usar 127.0.0.1 para forzar TCP
+// ---- INICIO DE MODO DEPURACIÓN ----
+// Esto nos mostrará cualquier error de PHP en la pantalla
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
+// ---- FIN DE MODO DEPURACIÓN ----
+
+define('DB_HOST', '127.0.0.1');
 define('DB_USER', 'root');
-define('DB_PASS', 'Japh2025');  // <- ajusta si tu password es distinto
+define('DB_PASS', 'Japh2025');
 define('DB_NAME', 'calzado_nica');
-define('DB_PORT', 3307);          // puerto cambiado
+define('DB_PORT', 3307);
 
-// Crear conexión (nota: mysqli acepta el puerto como 5º parámetro)
-$conn = new mysqli(DB_HOST, DB_USER, DB_PASS, DB_NAME, DB_PORT);
+ $conn = new mysqli(DB_HOST, DB_USER, DB_PASS, DB_NAME, DB_PORT);
 
-// Verificar conexión
 if ($conn->connect_error) {
-    die("Conexión fallida: " . $conn->connect_error);
+    // Forzar una respuesta JSON limpia incluso en caso de error de conexión
+    http_response_code(500);
+    header('Content-Type: application/json');
+    die(json_encode(['success' => false, 'message' => 'Error de conexión a la BD', 'error' => $conn->connect_error]));
 }
-$conn->set_charset("utf8mb4");
 
+ $conn->set_charset("utf8mb4");
+
+// ¡NI UN ESPACIO DESPUÉS DE ESTA LÍNEA!
 ?>

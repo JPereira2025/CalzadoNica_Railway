@@ -1,8 +1,7 @@
-// --- VERSIÓN 3.3 - REPARADA Y MEJORADA PARA CLAVES FORÁNEAS ---
+// --- VERSIÓN 3.0 - CORREGIDA Y FINAL ---
 
 // Configuración de la API
 const API_BASE = 'http://localhost/Zapatos/endpoints/';
-console.log("Script.js cargado correctamente");
 
 // Estado global de la aplicación
 let currentUser = null;
@@ -247,18 +246,12 @@ function updateIdCounters() {
     });
 }
 
-// --- FUNCIONES AYUDANTES PARA GENERAR IDS (CORREGIDAS) ---
-function generateFacturaId() {
-    const consecutivo = String(idCounters.facturas++).padStart(4, '0');
-    return `FACT-${consecutivo}`;
-}
+// --- FUNCIONES AYUDANTES PARA GENERAR IDS (NUEVO Y MEJORADO) ---
 function generateEmpleadoId(payload) {
     const nombre1 = payload.nombres ? payload.nombres.substring(0, 1).toUpperCase() : 'X';
-    const apellidos = payload.apellidos ? payload.apellidos.split(' ') : ['X', 'X'];
-    const apellido1 = apellidos[0] ? apellidos[0].substring(0, 1).toUpperCase() : 'X';
-    const apellido2 = apellidos[1] ? apellidos[1].substring(0, 1).toUpperCase() : 'X';
+    const nombre2 = payload.apellidos ? payload.apellidos.split(' ')[0].substring(0, 1).toUpperCase() : 'X';
     const fechaFormateada = payload.fecha_nacimiento ? payload.fecha_nacimiento.replace(/-/g, '') : '00000000';
-    return `EMP-${nombre1}${apellido1}${apellido2}-${fechaFormateada}`;
+    return `EMP-${nombre1}${nombre2}-${fechaFormateada}`;
 }
 
 function generateCategoriaId(payload) {
@@ -322,16 +315,10 @@ function openEmpleadoModal(id = null) {
         apiCall(`empleados.php?id=${id}`).done(data => {
             const emp = normalizeList(data)[0];
             if (emp) {
-                $('#empleado-nombres').val(emp.nombres);
-                $('#empleado-apellidos').val(emp.apellidos);
-                $('#empleado-sueldo').val(emp.sueldo_base);
-                $('#empleado-nacimiento').val(emp.fecha_nacimiento);
-                $('#empleado-cedula').val(emp.cedula);
-                $('#empleado-sexo').val(emp.sexo);
-                $('#empleado-estado').val(emp.estado_civil);
-                $('#empleado-telefono').val(emp.telefono);
-                $('#empleado-direccion').val(emp.direccion);
-                $('#empleado-cargo').val(emp.cargo);
+                Object.keys(emp).forEach(key => {
+                    const inputId = `#empleado-${key.replace(/_/g, '-')}`;
+                    $(inputId).val(emp[key]);
+                });
             }
         });
     }
@@ -406,6 +393,7 @@ function loadCategorias() {
         localStorage.setItem('categorias', JSON.stringify(data));
         renderTable('categorias-table-body', data, renderCategoriaRow);
         updateIdCounters();
+        loadCategoriasForDropdown();
     }).fail(() => {
         const localData = JSON.parse(localStorage.getItem('categorias') || '[]');
         renderTable('categorias-table-body', localData, renderCategoriaRow);
@@ -432,9 +420,8 @@ function openCategoriaModal(id = null) {
 function handleCategoriaSubmit(e) {
     e.preventDefault();
     const id = $('#categoria-id-form').val();
-    const nombre = $('#categoria-nombre').val();
     const payload = {
-        nombre: nombre,
+        nombre: $('#categoria-nombre').val(),
         descripcion: $('#categoria-descripcion').val()
     };
     
@@ -482,6 +469,7 @@ function loadEstilos() {
         localStorage.setItem('estilos', JSON.stringify(data));
         renderTable('estilos-table-body', data, renderEstiloRow);
         updateIdCounters();
+        loadEstilosForDropdown();
     }).fail(() => {
         const localData = JSON.parse(localStorage.getItem('estilos') || '[]');
         renderTable('estilos-table-body', localData, renderEstiloRow);
@@ -508,9 +496,8 @@ function openEstiloModal(id = null) {
 function handleEstiloSubmit(e) {
     e.preventDefault();
     const id = $('#estilo-id-form').val();
-    const nombre = $('#estilo-nombre').val();
     const payload = {
-        nombre: nombre,
+        nombre: $('#estilo-nombre').val(),
         descripcion: $('#estilo-descripcion').val()
     };
     
@@ -572,34 +559,27 @@ function openProductoModal(id = null) {
     resetForm('#form-producto', '#producto-id-form');
     $('#modal-producto-title').text(id ? 'Editar Producto' : 'Nuevo Producto');
     $('#producto-id-form').val(id || '');
+    
+    loadCategoriasForDropdown();
+    loadEstilosForDropdown();
 
-    // Cargar los desplegables cada vez que se abre el modal para asegurar datos frescos
-    const categoriasPromise = loadCategoriasForDropdown();
-    const estilosPromise = loadEstilosForDropdown();
-
-    Promise.all([categoriasPromise, estilosPromise]).then(() => {
-        if (id) {
-            apiCall(`productos.php?id=${id}`).done(data => {
-                const prod = normalizeList(data)[0];
-                if (prod) {
-                    $('#producto-marca').val(prod.marca);
-                    $('#producto-modelo').val(prod.modelo);
-                    $('#producto-talla').val(prod.talla);
-                    $('#producto-color').val(prod.color);
-                    $('#producto-precio').val(prod.precio);
-                    $('#producto-stock').val(prod.stock);
-                    $('#producto-categoria').val(prod.categoria_id);
-                    $('#producto-estilo').val(prod.estilo_id);
-                }
-                openModal('#modal-producto');
-            });
-        } else {
-            openModal('#modal-producto');
-        }
-    }).catch(error => {
-        console.error("Error al cargar datos para el modal de producto:", error);
-        showNotification('No se pudieron cargar los datos necesarios para el formulario de productos.', 'error');
-    });
+    if (id) {
+        apiCall(`productos.php?id=${id}`).done(data => {
+            const prod = normalizeList(data)[0];
+            if (prod) {
+                $('#producto-marca').val(prod.marca);
+                $('#producto-modelo').val(prod.modelo);
+                $('#producto-talla').val(prod.talla);
+                $('#producto-color').val(prod.color);
+                $('#producto-precio').val(prod.precio);
+                $('#producto-stock').val(prod.stock);
+                // Usar los nombres de columna correctos
+                $('#producto-categoria').val(prod.categoria_id);
+                $('#producto-estilo').val(prod.estilo_id);
+            }
+        });
+    }
+    openModal('#modal-producto');
 }
 
 function handleProductoSubmit(e) {
@@ -612,38 +592,17 @@ function handleProductoSubmit(e) {
         color: $('#producto-color').val(),
         precio: parseFloat($('#producto-precio').val()) || 0,
         stock: parseInt($('#producto-stock').val()) || 0,
-        categoria_id: String($('#producto-categoria').val()),
-        estilo_id: String($('#producto-estilo').val())
+        categoria_id: $('#producto-categoria').val(),
+        estilo_id: $('#producto-estilo').val()
     };
     
-    // Validación para asegurar que se seleccionan categoría y estilo
-    if (!payload.categoria_id || !payload.estilo_id) {
-        showNotification('Debe seleccionar una categoría y un estilo para el producto.', 'error');
-        return;
-    }
+    payload.id = id || generateProductoId(payload);
 
     const method = id ? 'PUT' : 'POST';
-
-    if (method === 'POST') {
-        payload.id = generateProductoId(payload);
-    } else { // PUT
-        payload.id = id;
-    }
-
-    // DEPURACIÓN: Muestra en la consola el payload que se enviará
-    console.log("Enviando payload de producto:", payload);
-
     apiCall('productos.php', method, payload).done(resp => {
         showNotification(resp.message, 'success');
         $('#modal-producto').fadeOut(200);
         loadProductos();
-    }).fail(xhr => {
-        // Si el servidor responde con un error específico, muéstralo.
-        if (xhr.responseJSON && xhr.responseJSON.message) {
-            showNotification(xhr.responseJSON.message, 'error');
-        } else {
-            showNotification('Error desconocido al guardar el producto. Revisa la consola.', 'error');
-        }
     });
 }
 
@@ -945,19 +904,13 @@ function guardarFactura(e) {
         showNotification("Agregue productos a la factura.", "error");
         return;
     }
-    const facturaId = generateFacturaId();
     const facturaData = {
-        id: facturaId,
         cliente: $("#factura-cliente").val(),
         vendedor: $("#factura-vendedor").val(),
         items: carritoFactura,
         descuento_codigo: descuentoAplicado.codigo || null,
         descuento_porcentaje: descuentoAplicado.porcentaje,
-        aplica_iva: $("#factura-iva").is(':checked'),
-        subtotal: $("#factura-subtotal").val(),
-        monto_descuento: $("#factura-descuento-monto").val(),
-        iva: $("#factura-iva-monto").val(),
-        total: $("#factura-total").val()
+        aplica_iva: $("#factura-iva").is(':checked')
     };
     apiCall('facturas.php', 'POST', facturaData).done(resp => {
         showNotification(resp.message, 'success');
@@ -988,12 +941,11 @@ function verFactura(id) {
                 <tbody>${itemsHtml}</tbody>
             </table>
             <div class="text-right">
-                <p>Subtotal: C$${parseFloat(factura.subtotal || 0).toFixed(2)}</p>
-                <p>Descuento: -C$${parseFloat(factura.monto_descuento || 0).toFixed(2)}</p>
-                <p>IVA (15%): C$${parseFloat(factura.iva || 0).toFixed(2)}</p>
-                <p class="text-lg font-bold">Total: C$${parseFloat(factura.total || 0).toFixed(2)}</p>
-            </div>
-        `;
+                <p>Subtotal: C$${parseFloat(factura.subtotal).toFixed(2)}</p>
+                <p>Descuento: -C$${parseFloat(factura.monto_descuento).toFixed(2)}</p>
+                <p>IVA (15%): C$${parseFloat(factura.iva).toFixed(2)}</p>
+                <p class="text-lg font-bold">Total: C$${parseFloat(factura.total).toFixed(2)}</p>
+            </div>`;
         $("#ver-factura-content").html(content);
         openModal("#modal-ver-factura");
     });
@@ -1008,36 +960,14 @@ function eliminarFactura(id) {
     }
 }
 
-function renderFacturaRow(factura) {
-    const totalF = parseFloat(factura.total || 0).toFixed(2);
-    const fechaF = new Date(factura.fecha).toLocaleString('es-NI');
-    return `
-    <tr data-id="${factura.id}">
-        <td class="py-3 px-4">${factura.id}</td>
-        <td class="py-3 px-4">${factura.cliente}</td>
-        <td class="py-3 px-4">${fechaF}</td>
-        <td class="py-3 px-4">${factura.vendedor}</td>
-        <td class="py-3 px-4 text-right">C$${totalF}</td>
-        <td class="py-3 px-4 text-center">
-            <button class="btn-ver-factura text-blue-600 hover:text-blue-800 mx-1" data-id="${factura.id}" title="Ver Detalles"><i class="fas fa-eye"></i></button>
-            <button class="btn-eliminar-factura text-red-600 hover:text-red-800 mx-1" data-id="${factura.id}" title="Eliminar"><i class="fas fa-trash-alt"></i></button>
-        </td>
-    </tr>
-    `;
-}
-
 // --- DROPDOWNS Y DASHBOARD ---
 function loadCategoriasForDropdown() {
-    // Retorna la promesa de la llamada AJAX
-    return apiCall('categorias.php').done(data => {
+    apiCall('categorias.php').done(data => {
         const categorias = normalizeList(data);
         const $sel = $('#producto-categoria');
         $sel.empty().append('<option value="">Seleccionar</option>');
         categorias.forEach(cat => { 
-            // DEPURACIÓN: Muestra en la consola los datos de la categoría
-            console.log("Categoría encontrada para dropdown:", cat);
-            // Asegúrate de que el ID y el nombre se usen correctamente
-            $sel.append(`<option value="${String(cat.id).trim()}">${String(cat.nombre).trim()}</option>`); 
+            $sel.append(`<option value="${cat.id}">${cat.nombre}</option>`); 
         });
     }).fail(() => {
         showNotification('No se pudieron cargar las categorías para el desplegable.', 'error');
@@ -1045,16 +975,12 @@ function loadCategoriasForDropdown() {
 }
 
 function loadEstilosForDropdown() {
-    // Retorna la promesa de la llamada AJAX
-    return apiCall('estilos.php').done(data => {
+    apiCall('estilos.php').done(data => {
         const estilos = normalizeList(data);
         const $sel = $('#producto-estilo');
         $sel.empty().append('<option value="">Seleccionar</option>');
         estilos.forEach(est => { 
-            // DEPURACIÓN: Muestra en la consola los datos del estilo
-            console.log("Estilo encontrado para dropdown:", est);
-            // Asegúrate de que el ID y el nombre se usen correctamente
-            $sel.append(`<option value="${String(est.id).trim()}">${String(est.nombre).trim()}</option>`); 
+            $sel.append(`<option value="${est.id}">${est.nombre}</option>`); 
         });
     }).fail(() => {
         showNotification('No se pudieron cargar los estilos para el desplegable.', 'error');
@@ -1139,7 +1065,7 @@ function handlePrint(e) {
     }
     const printWindow = window.open('', '', 'height=600,width=800');
     printWindow.document.write('<html><head><title>Imprimir</title>');
-    printWindow.document.write('<link rel="stylesheet" href="https://cdn.tailwindcss.com">');
+    printWindow.document.write('<link rel="stylesheet" href="https://cdn.tailwindcss.com">'); // Opcional: para estilos
     printWindow.document.write('</head><body>');
     printWindow.document.write(table.outerHTML);
     printWindow.document.write('</body></html>');
