@@ -1,5 +1,7 @@
 <?php
 require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/password_utils.php';
+require_once __DIR__ . '/auth.php';
 
 // Configurar cabeceras para CORS
 header('Content-Type: application/json; charset=utf-8');
@@ -63,21 +65,47 @@ try {
 
     if ($row = $result->fetch_assoc()) {
         $stored = $row['password'];
-        $ok = false;
-        
-        // Soporta hashes con password_verify o comparación en texto plano
+
+        $authenticated = false;
+        $needs_rehash = false;
+
+        // Verificar con password_verify si está hasheada
         if (password_verify($password, $stored)) {
-            $ok = true;
-        } elseif ($password === $stored) {
-            $ok = true;
+            $authenticated = true;
+            // Revisar si el hash necesita rehash a parámetros más fuertes
+            if (password_needs_rehash_secure($stored)) {
+                $needs_rehash = true;
+            }
+        } else {
+            // Soporte para contraseñas legadas en texto plano: comparar directamente
+            if ($password === $stored) {
+                $authenticated = true;
+                $needs_rehash = true; // siempre rehashear texto plano
+            }
         }
 
-        if ($ok) {
-            // Eliminar la contraseña del array antes de enviarlo
+        if ($authenticated) {
+            // Rehashear si es necesario (migración automática)
+            if ($needs_rehash) {
+                try {
+                    $newHash = hash_password_secure($password);
+                    $upd = $conn->prepare("UPDATE usuarios SET password = ? WHERE id = ?");
+                    if ($upd) {
+                        $upd->bind_param('si', $newHash, $row['id']);
+                        $upd->execute();
+                        $upd->close();
+                    }
+                } catch (Exception $e) {
+                    // No bloquear el login si falla el update; solo loguear
+                    error_log('No se pudo rehash/update password: ' . $e->getMessage());
+                }
+            }
+
             unset($row['password']);
+            setSessionUser($row);
             echo json_encode([
-                'success' => true, 
-                'user' => $row,
+                'success' => true,
+                'user' => getSessionUser(),
                 'message' => 'Login exitoso'
             ]);
             exit;

@@ -1,6 +1,8 @@
 <?php
 // endpoints/usuarios.php
 require_once 'db.php';
+require_once 'password_utils.php';
+require_once 'auth.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
@@ -13,6 +15,10 @@ if ($method === 'OPTIONS') {
     http_response_code(200);
     echo json_encode(['success' => true]);
     exit;
+}
+
+if (in_array($method, ['POST', 'PUT', 'DELETE'])) {
+    requireAdmin();
 }
 
 function jsonErr($msg, $code = 500) {
@@ -59,8 +65,8 @@ switch ($method) {
         }
 
         $username = $conn->real_escape_string($data['username']);
-        $role     = $conn->real_escape_string($data['role']);
-        $password = password_hash($data['password'], PASSWORD_BCRYPT);
+        $role     = normalizeRole($conn->real_escape_string($data['role']));
+        $password = hash_password_secure($data['password']);
 
         $sql = "INSERT INTO usuarios (username, password, role)
                 VALUES ('$username', '$password', '$role')";
@@ -90,12 +96,12 @@ switch ($method) {
         }
 
         if (isset($data['role'])) {
-            $r = $conn->real_escape_string($data['role']);
+            $r = normalizeRole($conn->real_escape_string($data['role']));
             $updates[] = "role='$r'";
         }
 
         if (isset($data['password']) && $data['password'] !== '') {
-            $pass = password_hash($data['password'], PASSWORD_BCRYPT);
+            $pass = hash_password_secure($data['password']);
             $updates[] = "password='$pass'";
         }
 

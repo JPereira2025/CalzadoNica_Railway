@@ -7,7 +7,7 @@ header("Access-Control-Allow-Headers: Content-Type, Authorization");
 
 // Configuración de la base de datos
  $host = 'localhost';
- $dbname = 'zapatos'; // Reemplaza con el nombre de tu BD
+ $dbname = 'calzado_nica'; // Reemplaza con el nombre de tu BD
  $username = 'root';
  $password = '';
 

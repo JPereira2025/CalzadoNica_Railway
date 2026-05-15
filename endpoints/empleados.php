@@ -1,14 +1,16 @@
 <?php
 // endpoints/empleados.php
 require_once 'db.php';
+require_once 'auth.php';
 
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS');
-header('Access-Control-Allow-Headers: Content-Type');
+header('Access-Control-Allow-Headers: Content-Type, Authorization');
 
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
 if ($method === 'OPTIONS') { http_response_code(200); echo json_encode(['success' => true]); exit; }
+if (in_array($method, ['POST', 'PUT', 'DELETE'])) { requireAdmin(); }
 
 // obtener lista de columnas de la tabla empleados
 $allCols = [];
@@ -36,11 +38,12 @@ function escapeVal($conn, $val) {
 switch ($method) {
     case 'GET':
         if (isset($_GET['id']) && $_GET['id'] !== '') {
-            $idq = $conn->real_escape_string($_GET['id']);
-            $sql = "SELECT * FROM empleados WHERE " . ($idCol ?: 'id') . "='$idq' LIMIT 1";
-            $res = $conn->query($sql);
-            $row = $res && $res->num_rows ? $res->fetch_assoc() : null;
-            echo json_encode($row ? $row : []);
+            $stmt = $conn->prepare("SELECT * FROM empleados WHERE " . ($idCol ?: 'id') . " = ? LIMIT 1");
+            $stmt->bind_param('s', $_GET['id']);
+            $stmt->execute();
+            $result = $stmt->get_result();
+            $row = $result->fetch_assoc();
+            echo json_encode($row ?: []);
             break;
         }
         $sql = "SELECT * FROM empleados";
@@ -69,14 +72,16 @@ switch ($method) {
         if (empty($map)) { http_response_code(400); echo json_encode(['success'=>false,'message'=>'No hay columnas válidas detectadas en la tabla empleados']); break; }
 
         $cols = array_keys($map);
-        $vals = array_map(function($v) use($conn){ return escapeVal($conn,$v); }, array_values($map));
-        $sql = "INSERT INTO empleados (" . implode(',', $cols) . ") VALUES (" . implode(',', $vals) . ")";
-
-        if ($conn->query($sql) === TRUE) {
+        $placeholders = str_repeat('?,', count($map) - 1) . '?';
+        $sql = "INSERT INTO empleados (" . implode(',', $cols) . ") VALUES ($placeholders)";
+        $stmt = $conn->prepare($sql);
+        $types = str_repeat('s', count($map)); // asumir string, ajustar si necesario
+        $stmt->bind_param($types, ...array_values($map));
+        if ($stmt->execute()) {
             echo json_encode(['success' => true, 'message' => 'Empleado creado correctamente', 'id' => $map[$idCol] ?? null]);
         } else {
             http_response_code(500);
-            echo json_encode(['success' => false, 'message' => 'Error: ' . $conn->error]);
+            echo json_encode(['success' => false, 'message' => 'Error: ' . $stmt->error]);
         }
         break;
 
@@ -84,7 +89,6 @@ switch ($method) {
         $data = json_decode(file_get_contents('php://input'), true) ?: [];
         $id = $data['id'] ?? ($_GET['id'] ?? null);
         if (!$id) { http_response_code(400); echo json_encode(['success'=>false,'message'=>'ID no proporcionado']); break; }
-        $idEsc = $conn->real_escape_string($id);
 
         $map = [];
         if (in_array('nombres', $allCols)) $map['nombres'] = $data['nombres'] ?? '';
@@ -98,28 +102,39 @@ switch ($method) {
         if (empty($map)) { http_response_code(400); echo json_encode(['success'=>false,'message'=>'Nada que actualizar']); break; }
 
         $sets = [];
-        foreach ($map as $col => $val) $sets[] = $col . '=' . escapeVal($conn, $val);
+        $values = [];
+        $types = '';
+        foreach ($map as $col => $val) {
+            $sets[] = "$col = ?";
+            $values[] = $val;
+            $types .= 's'; // asumir string
+        }
+        $values[] = $id;
+        $types .= 's';
         $whereCol = $idCol ?: 'id';
-        $sql = "UPDATE empleados SET " . implode(',', $sets) . " WHERE {$whereCol}='{$idEsc}'";
-        if ($conn->query($sql) === TRUE) {
+        $sql = "UPDATE empleados SET " . implode(',', $sets) . " WHERE {$whereCol} = ?";
+        $stmt = $conn->prepare($sql);
+        $stmt->bind_param($types, ...$values);
+        if ($stmt->execute()) {
             echo json_encode(['success' => true, 'message' => 'Empleado actualizado correctamente']);
         } else {
             http_response_code(500);
-            echo json_encode(['success' => false, 'message' => 'Error: ' . $conn->error]);
+            echo json_encode(['success' => false, 'message' => 'Error: ' . $stmt->error]);
         }
         break;
 
     case 'DELETE':
         $id = $_GET['id'] ?? null;
         if (!$id) { http_response_code(400); echo json_encode(['success'=>false,'message'=>'ID no proporcionado']); break; }
-        $id = $conn->real_escape_string($id);
         $whereCol = $idCol ?: 'id';
-        $sql = "DELETE FROM empleados WHERE {$whereCol}='$id'";
-        if ($conn->query($sql) === TRUE) {
+        $sql = "DELETE FROM empleados WHERE {$whereCol} = ?";
+        $stmt = $conn->prepare($sql);
+        $stmt->bind_param('s', $id);
+        if ($stmt->execute()) {
             echo json_encode(['success' => true, 'message' => 'Empleado eliminado']);
         } else {
             http_response_code(500);
-            echo json_encode(['success' => false, 'message' => 'Error: ' . $conn->error]);
+            echo json_encode(['success' => false, 'message' => 'Error: ' . $stmt->error]);
         }
         break;
 

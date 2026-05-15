@@ -1,5 +1,6 @@
 <?php
 require_once __DIR__ . '/db.php';
+require_once __DIR__ . '/auth.php';
 
 header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');
@@ -12,6 +13,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit;
 }
 
+$method = $_SERVER['REQUEST_METHOD'];
+if (in_array($method, ['POST', 'PUT', 'DELETE'])) { requireAdmin(); }
+
 function jsonErr($msg, $code = 500) {
     http_response_code($code);
     echo json_encode(['success' => false, 'message' => $msg]);
@@ -20,7 +24,7 @@ function jsonErr($msg, $code = 500) {
 
 function parseCurrency($text) {
     if ($text === null) return 0;
-    $num = preg_replace('/[^\d\.\-]/u','', (string)$text);
+    $num = preg_replace('/[^\d\.\-]/u','', (string)$text); // El regex es correcto para eliminar caracteres no numéricos excepto punto y signo de menos.
     return is_numeric($num) ? floatval($num) : 0;
 }
 

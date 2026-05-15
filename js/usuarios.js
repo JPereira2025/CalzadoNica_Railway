@@ -1,12 +1,23 @@
 // --- MÓDULO: USUARIOS ---
+// Etapas del módulo:
+// 1. setupUsuariosListeners(): define listeners de UI para crear, editar y eliminar usuarios.
+// 2. loadUsuarios(): carga la lista desde la API y renderiza la tabla.
+// 3. openUsuarioModal(): abre el modal para creación o edición.
+// 4. handleUsuarioSubmit(): envía el formulario y refresca la lista.
+// 5. renderUsuarioRow(): construye la fila HTML de cada usuario.
 
 /**
  * Configura los listeners para el módulo de usuarios
  */
 function setupUsuariosListeners() {
-    $("#btn-add-usuario").on("click", () => openUsuarioModal());
-    $(document).on("click", ".btn-edit-usuario", function() { openUsuarioModal($(this).closest("tr").data("id")); });
+    $("#btn-add-usuario").on("click", () => {
+        if (ensureAdminAction('crear un usuario')) openUsuarioModal();
+    });
+    $(document).on("click", ".btn-edit-usuario", function() {
+        if (ensureAdminAction('editar un usuario')) openUsuarioModal($(this).closest("tr").data("id"));
+    });
     $(document).on("click", ".btn-delete-usuario", function() {
+        if (!ensureAdminAction('eliminar un usuario')) return;
         const id = $(this).closest("tr").data("id");
         if (confirm("¿Eliminar este usuario?")) {
             apiCall(`usuarios.php?id=${id}`, 'DELETE').done(response => {
@@ -31,6 +42,7 @@ function loadUsuarios() {
  * Abre el modal de usuario
  */
 function openUsuarioModal(id = null) {
+    if (!ensureAdminAction(id ? 'editar un usuario' : 'crear un usuario')) return;
     resetForm('#form-usuario', '#usuario-id-form');
     $('#modal-usuario-title').text(id ? "Editar Usuario" : "Nuevo Usuario");
     $('#usuario-id-form').val(id || '');
@@ -54,6 +66,7 @@ function openUsuarioModal(id = null) {
  */
 function handleUsuarioSubmit(e) {
     e.preventDefault();
+    if (!ensureAdminAction('guardar un usuario')) return;
     const id = $("#usuario-id-form").val() || null;
     const userData = {
         id: id,

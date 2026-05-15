@@ -1,12 +1,23 @@
 // --- MÓDULO: PRODUCTOS ---
+// Etapas del módulo:
+// 1. setupProductosListeners(): define listeners de UI para crear, editar y eliminar productos.
+// 2. loadProductos(): carga la lista desde la API y renderiza la tabla.
+// 3. openProductoModal(): abre el modal para creación o edición.
+// 4. handleProductoSubmit(): envía el formulario y refresca la lista.
+// 5. renderProductoRow(): construye la fila HTML de cada producto.
 
 /**
  * Configura los listeners para el módulo de productos
  */
 function setupProductosListeners() {
-    $('#btn-add-producto').on('click', () => openProductoModal());
-    $(document).on('click', '.btn-edit-producto', function() { openProductoModal($(this).closest('tr').data('id')); });
+    $('#btn-add-producto').on('click', () => {
+        if (ensureAdminAction('crear un producto')) openProductoModal();
+    });
+    $(document).on('click', '.btn-edit-producto', function() {
+        if (ensureAdminAction('editar un producto')) openProductoModal($(this).closest('tr').data('id'));
+    });
     $(document).on('click', '.btn-delete-producto', function() {
+        if (!ensureAdminAction('eliminar un producto')) return;
         const id = $(this).closest('tr').data('id');
         if (confirm('¿Eliminar producto?')) {
             apiCall(`productos.php?id=${id}`, 'DELETE').done(resp => {
@@ -40,6 +51,7 @@ function loadProductos(callback) {
  * Abre el modal de producto
  */
 function openProductoModal(id = null) {
+    if (!ensureAdminAction(id ? 'editar un producto' : 'crear un producto')) return;
     resetForm('#form-producto', '#producto-id-form');
     $('#modal-producto-title').text(id ? 'Editar Producto' : 'Nuevo Producto');
     $('#producto-id-form').val(id || '');
@@ -77,6 +89,7 @@ function openProductoModal(id = null) {
  */
 function handleProductoSubmit(e) {
     e.preventDefault();
+    if (!ensureAdminAction('guardar un producto')) return;
     const id = $('#producto-id-form').val();
     const payload = {
         marca: $('#producto-marca').val(),

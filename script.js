@@ -1,7 +1,7 @@
 // --- VERSIÓN 3.3 - REPARADA Y MEJORADA PARA CLAVES FORÁNEAS ---
 
 // Configuración de la API
-const API_BASE = 'http://localhost/Zapatos/endpoints/';
+const API_BASE = 'endpoints/';
 console.log("Script.js cargado correctamente");
 
 // Estado global de la aplicación
@@ -86,6 +86,11 @@ function handleLogin(e) {
     const username = $("#username").val().trim();
     const password = $("#password").val();
 
+    if (!username || !password) {
+        $("#loginError").removeClass("hidden").text('Por favor, complete todos los campos.');
+        return;
+    }
+
     const $submitBtn = $(e.target).find('button[type="submit"]');
     $submitBtn.prop('disabled', true).text('Iniciando...');
 
@@ -98,7 +103,7 @@ function handleLogin(e) {
                 showApp();
                 navigateTo('dashboard');
             } else {
-                $("#loginError").removeClass("hidden").text(response.message || 'Error al iniciar sesión');
+                $("#loginError").removeClass("hidden").text(response.message || 'Usuario o contraseña incorrectos. Inténtelo nuevamente.');
             }
         })
         .fail(() => showNotification('Error de conexión. Revisa la consola (F12).', 'error'))
@@ -909,7 +914,7 @@ function calcularTotales() {
     const montoDescuento = subtotal * (descuentoAplicado.porcentaje / 100);
     const baseIva = subtotal - montoDescuento;
     const iva = $("#factura-iva").is(':checked') ? baseIva * 0.15 : 0;
-    const total = baseIva + iva;
+    const total = subtotal - montoDescuento + iva;
     $("#factura-subtotal").text(`C$${subtotal.toFixed(2)}`);
     $("#factura-monto-descuento").text(`-C$${montoDescuento.toFixed(2)}`);
     $("#factura-iva-monto").text(`C$${iva.toFixed(2)}`);
@@ -954,10 +959,10 @@ function guardarFactura(e) {
         descuento_codigo: descuentoAplicado.codigo || null,
         descuento_porcentaje: descuentoAplicado.porcentaje,
         aplica_iva: $("#factura-iva").is(':checked'),
-        subtotal: $("#factura-subtotal").val(),
-        monto_descuento: $("#factura-descuento-monto").val(),
-        iva: $("#factura-iva-monto").val(),
-        total: $("#factura-total").val()
+        subtotal: $("#factura-subtotal").text().replace('C$', ''),
+        monto_descuento: $("#factura-monto-descuento").text().replace('-C$', ''),
+        iva: $("#factura-iva-monto").text().replace('C$', ''),
+        total: $("#factura-total").text().replace('C$', '')
     };
     apiCall('facturas.php', 'POST', facturaData).done(resp => {
         showNotification(resp.message, 'success');
@@ -1074,12 +1079,29 @@ function populateFacturaProductoSelect() {
 }
 
 function loadDashboardStats() {
-    apiCall('stats.php').done(stats => {
-        $('#stat-empleados').text(stats.empleados || 0);
-        $('#stat-productos').text(stats.productos || 0);
-        $('#stat-ventas').text(stats.ventas_mes || 0);
-        $('#stat-ingresos').text(`C$${parseFloat(stats.ingresos_mes || 0).toFixed(2)}`);
-    });
+    // Cargar empleados
+    apiCall('empleados.php').done(empleados => {
+        $('#stat-empleados').text(empleados.length || 0);
+    }).fail(() => $('#stat-empleados').text('0'));
+
+    // Cargar productos
+    apiCall('productos.php').done(productos => {
+        $('#stat-productos').text(productos.length || 0);
+    }).fail(() => $('#stat-productos').text('0'));
+
+    // Cargar categorías
+    apiCall('categorias.php').done(categorias => {
+        $('#stat-categorias').text(categorias.length || 0);
+    }).fail(() => $('#stat-categorias').text('0'));
+
+    // Cargar estilos
+    apiCall('estilos.php').done(estilos => {
+        $('#stat-estilos').text(estilos.length || 0);
+    }).fail(() => $('#stat-estilos').text('0'));
+
+    // Ventas e ingresos (por ahora 0, se pueden calcular de facturas)
+    $('#stat-ventas').text('0');
+    $('#stat-ingresos').text('C$0.00');
 }
 
 // --- CARRUSEL DEL DASHBOARD ---

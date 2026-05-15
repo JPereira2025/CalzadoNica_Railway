@@ -1,12 +1,23 @@
 // --- MÓDULO: CATEGORÍAS ---
+// Etapas del módulo:
+// 1. setupCategoriasListeners(): define listeners de UI para crear, editar y eliminar categorías.
+// 2. loadCategorias(): carga la lista desde la API y renderiza la tabla.
+// 3. openCategoriaModal(): abre el modal para creación o edición.
+// 4. handleCategoriaSubmit(): envía el formulario y refresca la lista.
+// 5. renderCategoriaRow(): construye la fila HTML de cada categoría.
 
 /**
  * Configura los listeners para el módulo de categorías
  */
 function setupCategoriasListeners() {
-    $('#btn-add-categoria').on('click', () => openCategoriaModal());
-    $(document).on('click', '.btn-edit-categoria', function() { openCategoriaModal($(this).closest('tr').data('id')); });
+    $('#btn-add-categoria').on('click', () => {
+        if (ensureAdminAction('crear una categoría')) openCategoriaModal();
+    });
+    $(document).on('click', '.btn-edit-categoria', function() {
+        if (ensureAdminAction('editar una categoría')) openCategoriaModal($(this).closest('tr').data('id'));
+    });
     $(document).on('click', '.btn-delete-categoria', function() {
+        if (!ensureAdminAction('eliminar una categoría')) return;
         const id = $(this).closest('tr').data('id');
         if (confirm('¿Eliminar categoría?')) {
             apiCall(`categorias.php?id=${id}`, 'DELETE').done(resp => {
@@ -37,6 +48,7 @@ function loadCategorias() {
  * Abre el modal de categoría
  */
 function openCategoriaModal(id = null) {
+    if (!ensureAdminAction(id ? 'editar una categoría' : 'crear una categoría')) return;
     resetForm('#form-categoria', '#categoria-id-form');
     $('#modal-categoria-title').text(id ? 'Editar Categoría' : 'Nueva Categoría');
     $('#categoria-id-form').val(id || '');
@@ -57,6 +69,7 @@ function openCategoriaModal(id = null) {
  */
 function handleCategoriaSubmit(e) {
     e.preventDefault();
+    if (!ensureAdminAction('guardar una categoría')) return;
     const id = $('#categoria-id-form').val();
     const nombre = $('#categoria-nombre').val();
     const payload = {

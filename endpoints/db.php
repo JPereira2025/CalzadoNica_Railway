@@ -10,9 +10,9 @@ error_reporting(E_ALL);
 
 define('DB_HOST', '127.0.0.1');
 define('DB_USER', 'root');
-define('DB_PASS', 'Japh2025');
+define('DB_PASS', '');
 define('DB_NAME', 'calzado_nica');
-define('DB_PORT', 3307);
+define('DB_PORT', 3306);
 
  $conn = new mysqli(DB_HOST, DB_USER, DB_PASS, DB_NAME, DB_PORT);
 

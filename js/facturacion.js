@@ -1,4 +1,10 @@
 // --- MÓDULO: FACTURACIÓN ---
+// Etapas del módulo:
+// 1. setupFacturacionListeners(): define listeners de UI para acciones de factura.
+// 2. loadFacturas(): carga facturas y muestra el historial.
+// 3. resetFacturaForm(): prepara el formulario de factura.
+// 4. agregarProductoAFactura(): agrega productos a la factura actual.
+// 5. renderFacturaRow(): construye la fila HTML de cada factura.
 
 let carritoFactura = [];
 let descuentoAplicado = { porcentaje: 0, codigo: '' };
@@ -7,19 +13,29 @@ let descuentoAplicado = { porcentaje: 0, codigo: '' };
  * Configura los listeners para el módulo de facturación
  */
 function setupFacturacionListeners() {
-    $('#btn-nueva-factura').on('click', resetFacturaForm);
-    $('#btn-agregar-producto-factura').on('click', agregarProductoAFactura);
+    $('#btn-nueva-factura').on('click', function() {
+        if (ensureAdminAction('iniciar una factura')) resetFacturaForm();
+    });
+    $('#btn-agregar-producto-factura').on('click', function() {
+        if (ensureAdminAction('agregar un producto a la factura')) agregarProductoAFactura();
+    });
     $(document).on('click', '.btn-eliminar-item-factura', function() {
+        if (!ensureAdminAction('eliminar un item de la factura')) return;
         carritoFactura.splice($(this).data('index'), 1);
         renderizarTablaFactura();
     });
-    $(document).on('click', '#btn-aplicar-codigo', function(e) { e.preventDefault(); aplicarCodigoDescuento(); });
-    $('#factura-descuento').on('keypress', function(e) { if (e.which === 13) { e.preventDefault(); aplicarCodigoDescuento(); } });
+    $(document).on('click', '#btn-aplicar-codigo', function(e) { e.preventDefault(); if (ensureAdminAction('aplicar un código de descuento')) aplicarCodigoDescuento(); });
+    $('#factura-descuento').on('keypress', function(e) { if (e.which === 13) { e.preventDefault(); if (ensureAdminAction('aplicar un código de descuento')) aplicarCodigoDescuento(); } });
     $('#factura-iva').on('change', calcularTotales);
     $('#form-factura').on('submit', guardarFactura);
-    $('#btn-cancelar-factura').on('click', resetFacturaForm);
+    $('#btn-cancelar-factura').on('click', function() {
+        if (ensureAdminAction('cancelar la factura')) resetFacturaForm();
+    });
     $(document).on('click', '.btn-ver-factura', function() { verFactura($(this).data('id')); });
-    $(document).on('click', '.btn-eliminar-factura', function() { eliminarFactura($(this).data('id')); });
+    $(document).on('click', '.btn-eliminar-factura', function() {
+        if (!ensureAdminAction('eliminar una factura')) return;
+        eliminarFactura($(this).data('id'));
+    });
 }
 
 /**
@@ -51,6 +67,7 @@ function resetFacturaForm() {
  * Agrega un producto al carrito
  */
 function agregarProductoAFactura() {
+    if (!ensureAdminAction('agregar un producto a la factura')) return;
     const productoId = $("#factura-producto-select").val();
     const cantidad = parseInt($("#factura-cantidad").val()) || 0;
     if (!productoId || cantidad <= 0) {
@@ -110,6 +127,7 @@ function calcularTotales() {
  * Aplica un código de descuento
  */
 function aplicarCodigoDescuento() {
+    if (!ensureAdminAction('aplicar un código de descuento')) return;
     const codigoIngresado = $("#factura-descuento").val().trim().toUpperCase();
     if (!codigoIngresado) {
         descuentoAplicado = { porcentaje: 0, codigo: '' };
@@ -137,6 +155,7 @@ function aplicarCodigoDescuento() {
  */
 function guardarFactura(e) {
     e.preventDefault();
+    if (!ensureAdminAction('guardar una factura')) return;
     if (carritoFactura.length === 0) {
         showNotification("Agregue productos a la factura.", "error");
         return;
@@ -202,6 +221,7 @@ function verFactura(id) {
  * Elimina una factura
  */
 function eliminarFactura(id) {
+    if (!ensureAdminAction('eliminar una factura')) return;
     if (confirm('¿Eliminar esta factura? Esta acción es permanente.')) {
         apiCall(`facturas.php?id=${id}`, 'DELETE').done(resp => {
             showNotification(resp.message, 'success');

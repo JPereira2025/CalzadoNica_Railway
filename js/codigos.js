@@ -1,4 +1,10 @@
 // --- MÓDULO: CÓDIGOS PROMOCIONALES ---
+// Etapas del módulo:
+// 1. setupCodigosListeners(): define listeners de UI para crear, editar y eliminar códigos.
+// 2. loadCodigos(): carga la lista desde la API y renderiza la tabla.
+// 3. openCodigoModal(): abre el modal para creación o edición.
+// 4. handleCodigoSubmit(): envía el formulario y refresca la lista.
+// 5. renderCodigoRow(): construye la fila HTML de cada código.
 
 let codigosDescuento = [];
 
@@ -6,9 +12,14 @@ let codigosDescuento = [];
  * Configura los listeners para el módulo de códigos
  */
 function setupCodigosListeners() {
-    $('#btn-add-codigo').on('click', () => openCodigoModal());
-    $(document).on('click', '.btn-edit-codigo', function() { openCodigoModal($(this).closest('tr').data('id')); });
+    $('#btn-add-codigo').on('click', () => {
+        if (ensureAdminAction('crear un código')) openCodigoModal();
+    });
+    $(document).on('click', '.btn-edit-codigo', function() {
+        if (ensureAdminAction('editar un código')) openCodigoModal($(this).closest('tr').data('id'));
+    });
     $(document).on('click', '.btn-delete-codigo', function() {
+        if (!ensureAdminAction('eliminar un código')) return;
         const id = $(this).closest('tr').data('id');
         if (confirm('¿Eliminar código?')) {
             apiCall(`codigos.php?id=${id}`, 'DELETE').done(resp => {
@@ -43,6 +54,7 @@ function loadCodigos(callback) {
  * Abre el modal de código
  */
 function openCodigoModal(id = null) {
+    if (!ensureAdminAction(id ? 'editar un código' : 'crear un código')) return;
     resetForm('#form-codigo', '#codigo-id-form');
     $('#modal-codigo-title').text(id ? 'Editar Código' : 'Nuevo Código');
     $('#codigo-id-form').val(id || '');
@@ -67,6 +79,7 @@ function openCodigoModal(id = null) {
  */
 function handleCodigoSubmit(e) {
     e.preventDefault();
+    if (!ensureAdminAction('guardar un código')) return;
     const id = $('#codigo-id-form').val();
     const payload = {
         codigo: $('#codigo-codigo').val(),

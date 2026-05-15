@@ -1,12 +1,23 @@
 // --- MÓDULO: ESTILOS ---
+// Etapas del módulo:
+// 1. setupEstilosListeners(): define listeners de UI para crear, editar y eliminar estilos.
+// 2. loadEstilos(): carga la lista desde la API y renderiza la tabla.
+// 3. openEstiloModal(): abre el modal para creación o edición.
+// 4. handleEstiloSubmit(): envía el formulario y refresca la lista.
+// 5. renderEstiloRow(): construye la fila HTML de cada estilo.
 
 /**
  * Configura los listeners para el módulo de estilos
  */
 function setupEstilosListeners() {
-    $('#btn-add-estilo').on('click', () => openEstiloModal());
-    $(document).on('click', '.btn-edit-estilo', function() { openEstiloModal($(this).closest('tr').data('id')); });
+    $('#btn-add-estilo').on('click', () => {
+        if (ensureAdminAction('crear un estilo')) openEstiloModal();
+    });
+    $(document).on('click', '.btn-edit-estilo', function() {
+        if (ensureAdminAction('editar un estilo')) openEstiloModal($(this).closest('tr').data('id'));
+    });
     $(document).on('click', '.btn-delete-estilo', function() {
+        if (!ensureAdminAction('eliminar un estilo')) return;
         const id = $(this).closest('tr').data('id');
         if (confirm('¿Eliminar estilo?')) {
             apiCall(`estilos.php?id=${id}`, 'DELETE').done(resp => {
@@ -37,6 +48,7 @@ function loadEstilos() {
  * Abre el modal de estilo
  */
 function openEstiloModal(id = null) {
+    if (!ensureAdminAction(id ? 'editar un estilo' : 'crear un estilo')) return;
     resetForm('#form-estilo', '#estilo-id-form');
     $('#modal-estilo-title').text(id ? 'Editar Estilo' : 'Nuevo Estilo');
     $('#estilo-id-form').val(id || '');
@@ -57,6 +69,7 @@ function openEstiloModal(id = null) {
  */
 function handleEstiloSubmit(e) {
     e.preventDefault();
+    if (!ensureAdminAction('guardar un estilo')) return;
     const id = $('#estilo-id-form').val();
     const nombre = $('#estilo-nombre').val();
     const payload = {

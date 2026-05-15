@@ -1,4 +1,10 @@
 // --- UTILIDADES COMPARTIDAS ---
+// Funciones de soporte para todo el frontend:
+// 1. showNotification(): muestra mensajes temporales al usuario.
+// 2. normalizeList(): unifica respuestas de API en listas.
+// 3. renderTable(): renderiza tablas y aplica permisos tras cargar datos.
+// 4. resetForm(): limpia formularios de modal antes de usar.
+// 5. openModal(): muestra los modales de edición.
 
 /**
  * Muestra notificaciones en la interfaz
@@ -41,6 +47,9 @@ function renderTable(tbodySelector, data, mapper) {
         $tbody.append(`<tr><td colspan="${colspan}" class="text-center py-4 text-gray-500">No hay datos para mostrar.</td></tr>`);
     } else {
         rows.forEach(item => { $tbody.append(mapper(item)); });
+    }
+    if (typeof applyRolePermissions === 'function') {
+        applyRolePermissions();
     }
 }
 

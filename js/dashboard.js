@@ -1,4 +1,8 @@
 // --- MÓDULO: DASHBOARD ---
+// Etapas del módulo:
+// 1. loadDashboardStats(): carga las métricas de productos, empleados, categorías y estilos.
+// 2. setupCarousel(): inicializa el carrusel de imágenes del dashboard.
+// 3. renderiza estadísticas y gestiona la UI del panel principal.
 
 /**
  * Carga y muestra las estadísticas del dashboard

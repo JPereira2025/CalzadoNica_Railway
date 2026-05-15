@@ -1,4 +1,8 @@
 // --- LÓGICA DE NAVEGACIÓN ---
+// Etapas de navegación:
+// 1. handleNavigation(): intercepta clicks en el sidebar y determina la página destino.
+// 2. navigateTo(page): muestra la sección correcta y carga datos específicos.
+// 3. applyRolePermissions(): re-aplica permisos luego de cambiar de página.
 
 /**
  * Maneja el click en los links de navegación
@@ -52,5 +56,9 @@ function navigateTo(page) {
                 });
             });
             break;
+    }
+
+    if (typeof applyRolePermissions === 'function') {
+        applyRolePermissions();
     }
 }

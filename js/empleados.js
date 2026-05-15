@@ -1,12 +1,23 @@
 // --- MÓDULO: EMPLEADOS ---
+// Etapas del módulo:
+// 1. setupEmpleadosListeners(): define listeners de UI para crear, editar y eliminar empleados.
+// 2. loadEmpleados(): carga la lista desde la API y renderiza la tabla.
+// 3. openEmpleadoModal(): abre el modal para creación o edición.
+// 4. handleEmpleadoSubmit(): envía el formulario y refresca la lista.
+// 5. renderEmpleadoRow(): construye la fila HTML de cada empleado.
 
 /**
  * Configura los listeners para el módulo de empleados
  */
 function setupEmpleadosListeners() {
-    $('#btn-add-empleado').on('click', () => openEmpleadoModal());
-    $(document).on('click', '.btn-edit-empleado', function() { openEmpleadoModal($(this).closest('tr').data('id')); });
+    $('#btn-add-empleado').on('click', () => {
+        if (ensureAdminAction('crear un empleado')) openEmpleadoModal();
+    });
+    $(document).on('click', '.btn-edit-empleado', function() {
+        if (ensureAdminAction('editar un empleado')) openEmpleadoModal($(this).closest('tr').data('id'));
+    });
     $(document).on('click', '.btn-delete-empleado', function() {
+        if (!ensureAdminAction('eliminar un empleado')) return;
         const id = $(this).closest('tr').data('id');
         if (confirm('¿Está seguro de que desea eliminar este empleado?')) {
             apiCall(`empleados.php?id=${id}`, 'DELETE').done(resp => {
@@ -37,6 +48,7 @@ function loadEmpleados() {
  * Abre el modal de empleado para crear o editar
  */
 function openEmpleadoModal(id = null) {
+    if (!ensureAdminAction(id ? 'editar un empleado' : 'crear un empleado')) return;
     resetForm('#form-empleado', '#empleado-id-form');
     $('#modal-empleado-title').text(id ? 'Editar Empleado' : 'Nuevo Empleado');
     $('#empleado-id-form').val(id || '');
@@ -65,6 +77,7 @@ function openEmpleadoModal(id = null) {
  */
 function handleEmpleadoSubmit(e) {
     e.preventDefault();
+    if (!ensureAdminAction('guardar un empleado')) return;
     const id = $('#empleado-id-form').val();
     const payload = {
         nombres: $('#empleado-nombres').val(),
