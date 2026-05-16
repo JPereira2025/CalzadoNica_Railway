@@ -1371,56 +1371,36 @@ function eliminarFactura(id) {
 
 // --- FUNCIONES PARA CARGAR ESTADÍSTICAS ---
 function loadDashboardStats() {
-    // Contar productos
+    // Llamada única al endpoint de estadísticas
     $.ajax({
-        url: API_URL + 'productos',
+        url: 'endpoints/stats.php',
         method: 'GET',
-        success: function(productos) {
-            $('#stat-productos').text(productos.length);
+        dataType: 'json',
+        success: function(counts) {
+            $('#stat-productos').text(counts.productos || 0);
+            $('#stat-empleados').text(counts.empleados || 0);
+            $('#stat-categorias').text(counts.categorias || 0);
+            $('#stat-estilos').text(counts.estilos || 0);
+            try {
+                const ventasCount = parseInt(counts.ventas || 0, 10);
+                const ventasPares = parseInt(counts.ventas_pares || 0, 10);
+                const ventasTotal = parseFloat(counts.ventas_total || 0);
+                $('#stat-ventas').text(ventasCount || 0);
+                $('#stat-ventas-pares').text(ventasPares || 0);
+                $('#stat-ingresos').text('C$' + ventasTotal.toFixed(2).replace(new RegExp('\\B(?=(\\d{3})+(?!\\d))', 'g'), ","));
+            } catch (e) {
+                $('#stat-ventas').text('0');
+                $('#stat-ventas-pares').text('0');
+                $('#stat-ingresos').text('C$0.00');
+            }
         },
         error: function() {
             $('#stat-productos').text('0');
-        }
-    });
-    
-    // Contar empleados
-    $.ajax({
-        url: API_URL + 'empleados',
-        method: 'GET',
-        success: function(empleados) {
-            $('#stat-empleados').text(empleados.length);
-        },
-        error: function() {
             $('#stat-empleados').text('0');
-        }
-    });
-    
-    // Contar facturas del mes actual
-    $.ajax({
-        url: API_URL + 'facturas',
-        method: 'GET',
-        success: function(facturas) {
-            const currentMonth = new Date().getMonth();
-            const currentYear = new Date().getFullYear();
-            
-            const ventasMes = facturas.filter(factura => {
-                const facturaDate = new Date(factura.fecha);
-                return facturaDate.getMonth() === currentMonth && facturaDate.getFullYear() === currentYear;
-            });
-            
-            $('#stat-ventas').text(ventasMes.length);
-            
-            // Calcular ingresos totales
-            const totalIngresos = ventasMes.reduce((total, factura) => {
-                return total + parseFloat(factura.total.replace('C$', ''));
-            }, 0);
-            
-            // LÍNEA CORREGIDA:
-            $('#stat-ingresos').text('C$' + totalIngresos.toFixed(2).replace(new RegExp('\\B(?=(\\d{3})+(?!\\d))', 'g'), ","));
-        },
-        error: function() {
-            $('#stat-ventas').text('0');
-            $('#stat-ingresos').text('C$0');
+            $('#stat-categorias').text('0');
+            $('#stat-estilos').text('0');
+            $('#stat-ventas').text('0.00');
+            $('#stat-ingresos').text('C$0.00');
         }
     });
 }

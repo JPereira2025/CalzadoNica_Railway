@@ -145,15 +145,41 @@ switch ($method) {
             if ($stmt->execute()) {
                 // $factura_id ya está definido arriba con el ID enviado por el cliente
 
-                // Insertar los items de la factura
+                // Insertar los items de la factura y actualizar stock
                 if (!empty($data['items']) && is_array($data['items'])) {
                     $itemStmt = $conn->prepare("INSERT INTO factura_items (id_factura, id_producto, nombre_producto, cantidad, precio_unitario) VALUES (?, ?, ?, ?, ?)");
+                    $stockStmt = $conn->prepare("SELECT stock FROM productos WHERE id = ? FOR UPDATE");
+                    $updateStockStmt = $conn->prepare("UPDATE productos SET stock = stock - ? WHERE id = ?");
+
                     foreach ($data['items'] as $item) {
                         $id_producto = $item['id'] ?? null;
                         $nombre_producto = $item['nombre'] ?? '';
                         $cantidad = intval($item['cantidad'] ?? 0);
                         $precio_unitario = floatval($item['precio'] ?? 0);
-                        
+
+                        if (!$id_producto) {
+                            throw new Exception('Producto inválido en la factura.');
+                        }
+
+                        $stockStmt->bind_param('s', $id_producto);
+                        $stockStmt->execute();
+                        $stockResult = $stockStmt->get_result();
+                        if (!$stockResult || $stockResult->num_rows === 0) {
+                            throw new Exception('Producto no encontrado: ' . $id_producto);
+                        }
+
+                        $stockRow = $stockResult->fetch_assoc();
+                        $currentStock = intval($stockRow['stock']);
+                        if ($cantidad <= 0) {
+                            throw new Exception('Cantidad inválida para el producto ' . $id_producto);
+                        }
+                        if ($cantidad > $currentStock) {
+                            throw new Exception('Stock insuficiente para el producto ' . $id_producto . '. Disponible: ' . $currentStock);
+                        }
+
+                        $updateStockStmt->bind_param('is', $cantidad, $id_producto);
+                        $updateStockStmt->execute();
+
                         $itemStmt->bind_param('ssssi', $factura_id, $id_producto, $nombre_producto, $cantidad, $precio_unitario);
                         $itemStmt->execute();
                     }

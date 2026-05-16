@@ -12,12 +12,25 @@ function loadDashboardStats() {
         apiCall('stats.php?type=productos'),
         apiCall('stats.php?type=empleados'),
         apiCall('stats.php?type=categorias'),
-        apiCall('stats.php?type=estilos')
-    ]).then(([prod, emp, cat, est]) => {
+        apiCall('stats.php?type=estilos'),
+        apiCall('stats.php?type=ventas')
+    ]).then(([prod, emp, cat, est, ventas]) => {
         $("#stat-productos").text(prod.count || 0);
         $("#stat-empleados").text(emp.count || 0);
         $("#stat-categorias").text(cat.count || 0);
         $("#stat-estilos").text(est.count || 0);
+        try {
+            const count = parseInt(ventas && (ventas.count || ventas.c) || 0, 10);
+            const total = parseFloat(ventas && (ventas.total || ventas.s) || 0);
+            const pairs = parseInt(ventas && ventas.pairs || 0, 10);
+            $("#stat-ventas").text(count || 0);
+            $("#stat-ventas-pares").text(pairs || 0);
+            $("#stat-ingresos").text('C$' + total.toFixed(2).replace(new RegExp('\\B(?=(\\d{3})+(?!\\d))', 'g'), ","));
+        } catch (e) {
+            $("#stat-ventas").text('0');
+            $("#stat-ventas-pares").text('0');
+            $("#stat-ingresos").text('C$0.00');
+        }
     }).catch(error => {
         console.error('Error cargando estadísticas:', error);
         showNotification('No se pudieron cargar las estadísticas.', 'warning');

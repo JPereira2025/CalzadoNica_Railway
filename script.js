@@ -1085,29 +1085,32 @@ function populateFacturaProductoSelect() {
 }
 
 function loadDashboardStats() {
-    // Cargar empleados
-    apiCall('empleados.php').done(empleados => {
-        $('#stat-empleados').text(empleados.length || 0);
-    }).fail(() => $('#stat-empleados').text('0'));
-
-    // Cargar productos
-    apiCall('productos.php').done(productos => {
-        $('#stat-productos').text(productos.length || 0);
-    }).fail(() => $('#stat-productos').text('0'));
-
-    // Cargar categorías
-    apiCall('categorias.php').done(categorias => {
-        $('#stat-categorias').text(categorias.length || 0);
-    }).fail(() => $('#stat-categorias').text('0'));
-
-    // Cargar estilos
-    apiCall('estilos.php').done(estilos => {
-        $('#stat-estilos').text(estilos.length || 0);
-    }).fail(() => $('#stat-estilos').text('0'));
-
-    // Ventas e ingresos (por ahora 0, se pueden calcular de facturas)
-    $('#stat-ventas').text('0');
-    $('#stat-ingresos').text('C$0.00');
+    // Obtener todos los contadores y ventas desde el endpoint central
+    apiCall('stats.php').then(counts => {
+        $('#stat-productos').text(counts.productos || 0);
+        $('#stat-empleados').text(counts.empleados || 0);
+        $('#stat-categorias').text(counts.categorias || 0);
+        $('#stat-estilos').text(counts.estilos || 0);
+        try {
+            const ventasCount = parseInt(counts.ventas || 0, 10);
+            const ventasPares = parseInt(counts.ventas_pares || 0, 10);
+            const ventasTotal = parseFloat(counts.ventas_total || 0);
+            $('#stat-ventas').text(ventasCount || 0);
+            $('#stat-ventas-pares').text(ventasPares || 0);
+            $('#stat-ingresos').text('C$' + ventasTotal.toFixed(2).replace(new RegExp('\\B(?=(\\d{3})+(?!\\d))', 'g'), ","));
+        } catch (e) {
+            $('#stat-ventas').text('0');
+            $('#stat-ventas-pares').text('0');
+            $('#stat-ingresos').text('C$0.00');
+        }
+    }).fail(() => {
+        $('#stat-productos').text('0');
+        $('#stat-empleados').text('0');
+        $('#stat-categorias').text('0');
+        $('#stat-estilos').text('0');
+        $('#stat-ventas').text('0.00');
+        $('#stat-ingresos').text('C$0.00');
+    });
 }
 
 // --- CARRUSEL DEL DASHBOARD ---
