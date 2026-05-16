@@ -1116,10 +1116,16 @@ function resetFacturaForm() {
 }
 
 function generateFacturaId() {
-    const dayNames = { 0: 'DO', 1: 'LU', 2: 'MA', 3: 'MI', 4: 'JU', 5: 'VI', 6: 'SA' };
-    const dayAbbr = dayNames[new Date().getDay()];
-    const counter = String(Math.floor(Math.random() * 900000) + 100000).padStart(6, '0');
-    return `FAC-${counter}-${dayAbbr}`;
+    const counter = (window.idCounters && typeof window.idCounters.facturas !== 'undefined')
+        ? String(window.idCounters.facturas++).padStart(3, '0')
+        : '001';
+    const now = new Date();
+    const year = String(now.getFullYear()).slice(-2);
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const hour = String(now.getHours()).padStart(2, '0');
+    const minute = String(now.getMinutes()).padStart(2, '0');
+    return `FACT${counter}-${year}${month}${day}-${hour}${minute}`;
 }
 
 function agregarProductoAFactura() {

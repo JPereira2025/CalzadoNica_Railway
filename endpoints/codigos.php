@@ -14,6 +14,19 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit();
 }
 
+function normalizePromoDate($date) {
+    $date = trim($date);
+    if ($date === '') return false;
+    $formats = ['Y-m-d', 'd/m/Y', 'd-m-Y', 'Y/m/d'];
+    foreach ($formats as $format) {
+        $dt = DateTime::createFromFormat($format, $date);
+        if ($dt && $dt->format($format) === $date) {
+            return $dt->format('Y-m-d');
+        }
+    }
+    return false;
+}
+
 $method = $_SERVER['REQUEST_METHOD'];
 if (in_array($method, ['POST', 'PUT', 'DELETE'])) { requireAdmin(); }
 
@@ -25,7 +38,7 @@ switch ($method) {
             if ($id) {
                 // --- CAMBIO CLAVE AQUÍ: Usar el nombre de tabla REAL ---
                 $stmt = $conn->prepare("SELECT * FROM codigos_promocionales WHERE id = ?");
-                $stmt->bind_param('i', $id);
+                $stmt->bind_param('s', $id);
                 $stmt->execute();
                 $result = $stmt->get_result();
                 $codigo = $result->fetch_assoc();
@@ -45,7 +58,9 @@ switch ($method) {
         break;
         
     case 'POST':
-        $data = json_decode(file_get_contents('php://input'), true);
+        $rawInput = file_get_contents('php://input');
+        error_log('codigos POST raw input: ' . $rawInput);
+        $data = json_decode($rawInput, true);
         
         if (!is_array($data) || empty($data['codigo'])) {
             http_response_code(400);
@@ -53,27 +68,45 @@ switch ($method) {
             exit;
         }
         
+        if (empty($data['fecha_inicio']) || empty($data['fecha_fin'])) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => 'Faltan datos requeridos (fecha_inicio o fecha_fin).']);
+            exit;
+        }
+
+        error_log('codigos POST raw fecha_inicio: ' . $data['fecha_inicio'] . ' fecha_fin: ' . $data['fecha_fin']);
+        $fecha_inicio = normalizePromoDate($data['fecha_inicio']);
+        $fecha_fin = normalizePromoDate($data['fecha_fin']);
+        error_log('codigos POST normalized fecha_inicio: ' . var_export($fecha_inicio, true) . ' fecha_fin: ' . var_export($fecha_fin, true));
+        if ($fecha_inicio === false || $fecha_fin === false) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => 'Las fechas deben tener formato YYYY-MM-DD o DD/MM/YYYY válido.']);
+            exit;
+        }
+        if ($fecha_fin < $fecha_inicio) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => 'La fecha fin debe ser igual o posterior a la fecha inicio.']);
+            exit;
+        }
+        
         try {
             // --- CAMBIO CLAVE AQUÍ: Usar el nombre de tabla REAL ---
-            $stmt = $conn->prepare("INSERT INTO codigos_promocionales (codigo, porcentaje_descuento, fecha_inicio, fecha_fin, estado, descripcion) VALUES (?, ?, ?, ?, ?, ?)");
+            $stmt = $conn->prepare("INSERT INTO codigos_promocionales (id, codigo, porcentaje_descuento, fecha_inicio, fecha_fin, estado, descripcion) VALUES (?, ?, ?, ?, ?, ?, ?)");
             
+            $id = !empty($data['id']) ? $data['id'] : 'COD-' . substr(bin2hex(random_bytes(4)), 0, 12);
             $codigo = $data['codigo'];
-            $porcentaje_descuento = $data['porcentaje_descuento'];
-            $fecha_inicio = $data['fecha_inicio'];
-            $fecha_fin = $data['fecha_fin'];
-            $estado = $data['estado'] ?? 1;
+            $porcentaje_descuento = isset($data['porcentaje_descuento']) ? (int)$data['porcentaje_descuento'] : 0;
+            $estado = isset($data['estado']) ? (int)$data['estado'] : 1;
             $descripcion = $data['descripcion'] ?? null;
             
-            $stmt->bind_param('siiiss', $codigo, $porcentaje_descuento, $fecha_inicio, $fecha_fin, $estado, $descripcion);
+            $stmt->bind_param('ssissis', $id, $codigo, $porcentaje_descuento, $fecha_inicio, $fecha_fin, $estado, $descripcion);
             
             if ($stmt->execute()) {
-                $new_id = $conn->insert_id;
-                
                 echo json_encode([
                     'success' => true, 
                     'message' => 'Código promocional creado correctamente',
                     'data' => [
-                        'id' => $new_id,
+                        'id' => $id,
                         'codigo' => $codigo,
                         'porcentaje_descuento' => $porcentaje_descuento,
                         'fecha_inicio' => $fecha_inicio,
@@ -83,7 +116,7 @@ switch ($method) {
                     ]
                 ]);
             } else {
-                echo json_encode(['success' => false, 'message' => 'Error al crear código promocional']);
+                echo json_encode(['success' => false, 'message' => 'Error al crear código promocional: ' . $stmt->error]);
             }
         } catch (Exception $e) {
             http_response_code(500);
@@ -100,24 +133,43 @@ switch ($method) {
             exit;
         }
         
+        if (empty($data['fecha_inicio']) || empty($data['fecha_fin'])) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => 'Faltan datos requeridos (fecha_inicio o fecha_fin).']);
+            exit;
+        }
+
+        error_log('codigos PUT raw fecha_inicio: ' . $data['fecha_inicio'] . ' fecha_fin: ' . $data['fecha_fin']);
+        $fecha_inicio = normalizePromoDate($data['fecha_inicio']);
+        $fecha_fin = normalizePromoDate($data['fecha_fin']);
+        error_log('codigos PUT normalized fecha_inicio: ' . var_export($fecha_inicio, true) . ' fecha_fin: ' . var_export($fecha_fin, true));
+        if ($fecha_inicio === false || $fecha_fin === false) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => 'Las fechas deben tener formato YYYY-MM-DD o DD/MM/YYYY válido.']);
+            exit;
+        }
+        if ($fecha_fin < $fecha_inicio) {
+            http_response_code(400);
+            echo json_encode(['success' => false, 'message' => 'La fecha fin debe ser igual o posterior a la fecha inicio.']);
+            exit;
+        }
+        
         try {
             // --- CAMBIO CLAVE AQUÍ: Usar el nombre de tabla REAL ---
             $stmt = $conn->prepare("UPDATE codigos_promocionales SET codigo = ?, porcentaje_descuento = ?, fecha_inicio = ?, fecha_fin = ?, estado = ?, descripcion = ? WHERE id = ?");
             
             $id = $data['id'];
             $codigo = $data['codigo'];
-            $porcentaje_descuento = $data['porcentaje_descuento'];
-            $fecha_inicio = $data['fecha_inicio'];
-            $fecha_fin = $data['fecha_fin'];
-            $estado = $data['estado'] ?? 1;
+            $porcentaje_descuento = isset($data['porcentaje_descuento']) ? (int)$data['porcentaje_descuento'] : 0;
+            $estado = isset($data['estado']) ? (int)$data['estado'] : 1;
             $descripcion = $data['descripcion'] ?? null;
             
-            $stmt->bind_param('siiissi', $codigo, $porcentaje_descuento, $fecha_inicio, $fecha_fin, $estado, $descripcion, $id);
+            $stmt->bind_param('sississ', $codigo, $porcentaje_descuento, $fecha_inicio, $fecha_fin, $estado, $descripcion, $id);
             
             if ($stmt->execute()) {
                 echo json_encode(['success' => true, 'message' => 'Código promocional actualizado correctamente']);
             } else {
-                echo json_encode(['success' => false, 'message' => 'Error al actualizar código promocional']);
+                echo json_encode(['success' => false, 'message' => 'Error al actualizar código promocional: ' . $stmt->error]);
             }
         } catch (Exception $e) {
             http_response_code(500);
@@ -130,7 +182,7 @@ switch ($method) {
             try {
                 // --- CAMBIO CLAVE AQUÍ: Usar el nombre de tabla REAL ---
                 $stmt = $conn->prepare("DELETE FROM codigos_promocionales WHERE id = ?");
-                $stmt->bind_param('i', $_GET['id']);
+                $stmt->bind_param('s', $_GET['id']);
                 
                 if ($stmt->execute()) {
                     echo json_encode(['success' => true, 'message' => 'Código promocional eliminado correctamente']);

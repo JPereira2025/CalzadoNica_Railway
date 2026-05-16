@@ -57,8 +57,9 @@ function resetFacturaForm() {
     descuentoAplicado = { porcentaje: 0, codigo: '' };
     $('#form-factura')[0].reset();
     $("#factura-iva").prop('checked', true);
-    $("#factura-numero").val(`FAC-${Date.now()}`);
-    $("#factura-fecha").val(new Date().toLocaleString('es-NI'));
+    $("#factura-numero").val(generateFacturaId());
+    const now = new Date();
+    $("#factura-fecha").val(now.toLocaleString('es-NI'));
     $("#factura-vendedor").val(currentUser ? currentUser.username : 'N/A');
     renderizarTablaFactura();
 }
@@ -160,11 +161,19 @@ function guardarFactura(e) {
         showNotification("Agregue productos a la factura.", "error");
         return;
     }
-    const facturaId = generateFacturaId();
+    const now = new Date();
+    const year = String(now.getFullYear());
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const hour = String(now.getHours()).padStart(2, '0');
+    const minute = String(now.getMinutes()).padStart(2, '0');
+    const second = String(now.getSeconds()).padStart(2, '0');
+    const fechaLocal = `${year}-${month}-${day} ${hour}:${minute}:${second}`;
+
     const facturaData = {
-        id: facturaId,
         cliente: $("#factura-cliente").val(),
         vendedor: $("#factura-vendedor").val(),
+        fecha: fechaLocal,
         items: carritoFactura,
         descuento_codigo: descuentoAplicado.codigo || null,
         descuento_porcentaje: descuentoAplicado.porcentaje,
@@ -254,6 +263,14 @@ function renderFacturaRow(factura) {
  * Genera ID único para factura
  */
 function generateFacturaId() {
-    const consecutivo = String(window.idCounters.facturas++).padStart(4, '0');
-    return `FACT-${consecutivo}`;
+    const counter = (window.idCounters && typeof window.idCounters.facturas !== 'undefined')
+        ? String(window.idCounters.facturas++).padStart(3, '0')
+        : '001';
+    const now = new Date();
+    const year = String(now.getFullYear()).slice(-2);
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const hour = String(now.getHours()).padStart(2, '0');
+    const minute = String(now.getMinutes()).padStart(2, '0');
+    return `FACT${counter}-${year}${month}${day}-${hour}${minute}`;
 }

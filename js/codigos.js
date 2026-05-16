@@ -81,15 +81,30 @@ function handleCodigoSubmit(e) {
     e.preventDefault();
     if (!ensureAdminAction('guardar un código')) return;
     const id = $('#codigo-id-form').val();
+    const fechaInicio = $('#codigo-fecha-inicio').val();
+    const fechaFin = $('#codigo-fecha-fin').val();
+
+    if (!fechaInicio || !fechaFin) {
+        showNotification('Debe seleccionar fecha de inicio y fecha de fin.', 'error');
+        return;
+    }
+    if (fechaFin < fechaInicio) {
+        showNotification('La fecha fin debe ser igual o posterior a la fecha inicio.', 'error');
+        return;
+    }
+
     const payload = {
-        codigo: $('#codigo-codigo').val(),
+        codigo: $('#codigo-codigo').val().trim(),
         porcentaje_descuento: $('#codigo-descuento').val(),
-        fecha_inicio: $('#codigo-fecha-inicio').val(),
-        fecha_fin: $('#codigo-fecha-fin').val(),
+        fecha_inicio: fechaInicio,
+        fecha_fin: fechaFin,
         estado: $('#codigo-estado').val(),
-        descripcion: $('#codigo-descripcion').val()
+        descripcion: $('#codigo-descripcion').val().trim()
     };
-    payload.id = id || generateCodigoId();
+    if (id) {
+        payload.id = id;
+    }
+    console.log('Enviar código promocional', payload);
     const method = id ? 'PUT' : 'POST';
     apiCall('codigos.php', method, payload).done(resp => {
         showNotification(resp.message, 'success');

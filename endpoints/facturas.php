@@ -28,6 +28,38 @@ function parseCurrency($text) {
     return is_numeric($num) ? floatval($num) : 0;
 }
 
+function generateFacturaId($fecha = null) {
+    global $conn;
+    $dateTime = null;
+    if (!empty($fecha)) {
+        $dateTime = DateTime::createFromFormat('Y-m-d H:i:s', $fecha);
+        if (!$dateTime) {
+            $dateTime = new DateTime($fecha);
+        }
+    }
+    if (!$dateTime) {
+        $dateTime = new DateTime();
+    }
+
+    $regex = '^FACT[0-9]{3}-[0-9]{6}-[0-9]{4}$';
+    $sql = "SELECT MAX(CAST(SUBSTRING(id,5,3) AS UNSIGNED)) AS max_code FROM facturas WHERE id REGEXP ?";
+    $stmt = $conn->prepare($sql);
+    $stmt->bind_param('s', $regex);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $nextNumber = 1;
+    if ($result && $row = $result->fetch_assoc()) {
+        $max = intval($row['max_code']);
+        if ($max > 0) {
+            $nextNumber = $max + 1;
+        }
+    }
+    if ($nextNumber > 999) {
+        throw new Exception('No se pueden generar más facturas con el formato actual.');
+    }
+    return sprintf('FACT%03d-%s-%s', $nextNumber, $dateTime->format('ymd'), $dateTime->format('Hi'));
+}
+
 function existsProducto($conn, $id) {
     $stmt = $conn->prepare("SELECT id FROM productos WHERE id = ? LIMIT 1");
     $stmt->bind_param('s', $id);
@@ -107,8 +139,7 @@ switch ($method) {
             $total = parseCurrency($data['total'] ?? 0);
             $codigo_descuento = $data['descuento_codigo'] ?? null;
 
-            $factura_id = $data['id'] ?? null;
-            if (!$factura_id) throw new Exception('ID de factura no proporcionado desde el cliente.');
+            $factura_id = generateFacturaId($data['fecha'] ?? null);
             $stmt->bind_param('ssssdddds', $factura_id, $cliente, $vendedor, $fecha, $subtotal, $monto_descuento, $iva, $total, $codigo_descuento);
             
             if ($stmt->execute()) {

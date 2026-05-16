@@ -254,8 +254,14 @@ function updateIdCounters() {
 
 // --- FUNCIONES AYUDANTES PARA GENERAR IDS (CORREGIDAS) ---
 function generateFacturaId() {
-    const consecutivo = String(idCounters.facturas++).padStart(4, '0');
-    return `FACT-${consecutivo}`;
+    const counter = String(idCounters.facturas++).padStart(3, '0');
+    const now = new Date();
+    const year = String(now.getFullYear()).slice(-2);
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const hour = String(now.getHours()).padStart(2, '0');
+    const minute = String(now.getMinutes()).padStart(2, '0');
+    return `FACT${counter}-${year}${month}${day}-${hour}${minute}`;
 }
 function generateEmpleadoId(payload) {
     const nombre1 = payload.nombres ? payload.nombres.substring(0, 1).toUpperCase() : 'X';
