@@ -1,0 +1,121 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model categorias {
+  id          String  @id @db.VarChar(50)
+  nombre      String  @unique(map: "nombre") @db.VarChar(100)
+  descripcion String? @db.Text
+}
+
+model codigos_promocionales {
+  id                   String   @id @db.VarChar(20)
+  codigo               String   @unique(map: "codigo") @db.VarChar(20)
+  porcentaje_descuento Int
+  fecha_inicio         DateTime @db.Date
+  fecha_fin            DateTime @db.Date
+  estado               Boolean  @default(true)
+  descripcion          String?  @db.Text
+}
+
+model empleados {
+  id           String         @id @db.VarChar(20)
+  nombres      String         @db.VarChar(100)
+  apellidos    String         @db.VarChar(100)
+  sueldo       Decimal        @db.Decimal(10, 2)
+  nacimiento   DateTime       @db.Date
+  cedula       String         @unique(map: "cedula") @db.VarChar(20)
+  sexo         empleados_sexo
+  estado_civil String         @db.VarChar(50)
+  telefono     String         @db.VarChar(20)
+  direccion    String         @db.Text
+  cargo        String         @db.VarChar(100)
+}
+
+model estilos {
+  id          String  @id @db.VarChar(50)
+  nombre      String  @unique(map: "nombre") @db.VarChar(100)
+  descripcion String? @db.Text
+}
+
+model factura_items {
+  id              Int       @id @default(autoincrement())
+  id_factura      String    @db.VarChar(20)
+  id_producto     String    @db.VarChar(50)
+  nombre_producto String    @db.VarChar(255)
+  cantidad        Int
+  precio_unitario Decimal   @db.Decimal(10, 2)
+  facturas        facturas  @relation(fields: [id_factura], references: [id], onDelete: Cascade, map: "factura_items_ibfk_1")
+  productos       productos @relation(fields: [id_producto], references: [id], onDelete: Cascade, map: "factura_items_ibfk_2")
+
+  @@index([id_factura], map: "id_factura")
+  @@index([id_producto], map: "id_producto")
+}
+
+model facturas {
+  id               String          @id @db.VarChar(20)
+  cliente          String          @db.VarChar(255)
+  vendedor         String          @db.VarChar(50)
+  fecha            DateTime        @db.DateTime(0)
+  subtotal         Decimal         @db.Decimal(10, 2)
+  monto_descuento  Decimal         @default(0.00) @db.Decimal(10, 2)
+  iva              Decimal         @default(0.00) @db.Decimal(10, 2)
+  total            Decimal         @db.Decimal(10, 2)
+  codigo_descuento String?         @db.VarChar(50)
+  factura_items    factura_items[]
+}
+
+model productos {
+  id            String          @id @db.VarChar(50)
+  marca         String          @db.VarChar(100)
+  modelo        String          @db.VarChar(100)
+  talla         String          @db.VarChar(10)
+  color         String?         @db.VarChar(255)
+  categoria_id  String?         @db.VarChar(20)
+  estilo_id     String?         @db.VarChar(20)
+  precio        Decimal         @db.Decimal(10, 2)
+  stock         Int
+  factura_items factura_items[]
+
+  @@index([categoria_id], map: "categoria_id")
+  @@index([estilo_id], map: "estilo_id")
+}
+
+/// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
+model productos_backup {
+  id           String  @db.VarChar(50)
+  marca        String  @db.VarChar(100)
+  modelo       String  @db.VarChar(100)
+  talla        String  @db.VarChar(10)
+  color        String? @db.VarChar(255)
+  categoria_id String? @db.VarChar(20)
+  estilo_id    String? @db.VarChar(20)
+  precio       Decimal @db.Decimal(10, 2)
+  stock        Int
+
+  @@ignore
+}
+
+model usuarios {
+  id       Int           @id @default(autoincrement())
+  username String        @unique(map: "username") @db.VarChar(50)
+  password String        @db.VarChar(255)
+  role     usuarios_role
+}
+
+enum usuarios_role {
+  Administrador
+  Gerente
+  Vendedor
+}
+
+enum empleados_sexo {
+  Masculino
+  Femenino
+  Otro
+}

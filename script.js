@@ -1,11 +1,33 @@
 // --- VERSIÓN 3.3 - REPARADA Y MEJORADA PARA CLAVES FORÁNEAS ---
 
-// Configuración de la API
-const API_BASE = 'endpoints/';
+// Configuración de la API (apunta al backend Express)
+const API_BASE = 'http://localhost:3001/';
+
+// Mapear endpoints PHP a rutas del API Express
+function mapEndpoint(endpoint) {
+    if (!endpoint) return API_BASE;
+    const [path, qs] = endpoint.split('?');
+    const mapping = {
+        'login.php': 'login',
+        'logout.php': 'logout',
+        'empleados.php': 'api/empleados',
+        'productos.php': 'api/productos',
+        'categorias.php': 'api/categorias',
+        'estilos.php': 'api/estilos',
+        'codigos.php': 'api/codigos',
+        'facturas.php': 'api/facturas',
+        'usuarios.php': 'api/usuarios',
+        'stats.php': 'api/stats'
+    };
+
+    const base = mapping[path] ? mapping[path] : (path.endsWith('.php') ? path.replace('.php','') : path);
+    return API_BASE + base + (qs ? ('?' + qs) : '');
+}
 console.log("Script.js cargado correctamente");
 
 // Estado global de la aplicación
 let currentUser = null;
+let authToken = sessionStorage.getItem('authToken');
 let carritoFactura = [];
 let descuentoAplicado = { porcentaje: 0, codigo: '' };
 let codigosDescuento = []; // Cache de códigos descuento
@@ -31,7 +53,8 @@ let idCounters = {
 // --- VERIFICACIÓN DE SESIÓN ---
 function checkSession() {
     const savedUser = sessionStorage.getItem('currentUser');
-    if (savedUser) {
+    authToken = sessionStorage.getItem('authToken');
+    if (savedUser && authToken) {
         currentUser = JSON.parse(savedUser);
         showApp();
         navigateTo('dashboard');
@@ -98,7 +121,9 @@ function handleLogin(e) {
         .then(response => {
             if (response.success) {
                 currentUser = response.user;
+                authToken = response.token;
                 sessionStorage.setItem('currentUser', JSON.stringify(currentUser));
+                sessionStorage.setItem('authToken', authToken);
                 showNotification(`Bienvenido, ${currentUser.username}!`, "success");
                 showApp();
                 navigateTo('dashboard');
@@ -113,7 +138,9 @@ function handleLogin(e) {
 function handleLogout(e) {
     e.preventDefault();
     sessionStorage.removeItem('currentUser');
+    sessionStorage.removeItem('authToken');
     currentUser = null;
+    authToken = null;
     carritoFactura = [];
     showLogin();
 }
@@ -170,9 +197,20 @@ function navigateTo(page) {
 
 // --- FUNCIONES AUXILIARES ---
 function apiCall(endpoint, method = 'GET', data = null) {
+    const url = mapEndpoint(endpoint);
+    const headers = {
+        'Content-Type': 'application/json'
+    };
+
+    const token = authToken || sessionStorage.getItem('authToken');
+    if (token) {
+        headers['Authorization'] = 'Bearer ' + token;
+    }
+
     return $.ajax({
-        url: `${API_BASE}${endpoint}`,
+        url: url,
         method: method,
+        headers: headers,
         data: data ? JSON.stringify(data) : null,
         contentType: 'application/json',
         dataType: 'json'

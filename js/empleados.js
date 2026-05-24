@@ -32,13 +32,25 @@ function setupEmpleadosListeners() {
 /**
  * Carga la lista de empleados
  */
+function normalizeEmpleadoData(empleado) {
+    const sueldo = empleado.sueldo_base ?? empleado.sueldo ?? empleado.salario ?? 0;
+    const fechaNacimiento = empleado.fecha_nacimiento ?? empleado.nacimiento ?? '';
+    return {
+        ...empleado,
+        sueldo_base: sueldo,
+        fecha_nacimiento: fechaNacimiento,
+        nacimiento: fechaNacimiento
+    };
+}
+
 function loadEmpleados() {
     apiCall('empleados.php').done(data => {
-        localStorage.setItem('empleados', JSON.stringify(data));
-        renderTable('empleados-table-body', data, renderEmpleadoRow);
+        const normalized = normalizeList(data).map(normalizeEmpleadoData);
+        localStorage.setItem('empleados', JSON.stringify(normalized));
+        renderTable('empleados-table-body', normalized, renderEmpleadoRow);
         updateIdCounters();
     }).fail(() => {
-        const localData = JSON.parse(localStorage.getItem('empleados') || '[]');
+        const localData = JSON.parse(localStorage.getItem('empleados') || '[]').map(normalizeEmpleadoData);
         renderTable('empleados-table-body', localData, renderEmpleadoRow);
         showNotification('Error de red. Mostrando datos locales de empleados.', 'warning');
     });
@@ -47,6 +59,10 @@ function loadEmpleados() {
 /**
  * Abre el modal de empleado para crear o editar
  */
+function getEmpleadoSueldo(empleado) {
+    return empleado.sueldo_base ?? empleado.sueldo ?? empleado.salario ?? 0;
+}
+
 function openEmpleadoModal(id = null) {
     if (!ensureAdminAction(id ? 'editar un empleado' : 'crear un empleado')) return;
     resetForm('#form-empleado', '#empleado-id-form');
@@ -58,8 +74,8 @@ function openEmpleadoModal(id = null) {
             if (emp) {
                 $('#empleado-nombres').val(emp.nombres);
                 $('#empleado-apellidos').val(emp.apellidos);
-                $('#empleado-sueldo').val(emp.sueldo_base);
-                $('#empleado-nacimiento').val(emp.fecha_nacimiento);
+                $('#empleado-sueldo').val(getEmpleadoSueldo(emp));
+                $('#empleado-nacimiento').val(emp.fecha_nacimiento || emp.nacimiento || '');
                 $('#empleado-cedula').val(emp.cedula);
                 $('#empleado-sexo').val(emp.sexo);
                 $('#empleado-estado').val(emp.estado_civil);
@@ -79,10 +95,12 @@ function handleEmpleadoSubmit(e) {
     e.preventDefault();
     if (!ensureAdminAction('guardar un empleado')) return;
     const id = $('#empleado-id-form').val();
+    const sueldoValor = $('#empleado-sueldo').val();
     const payload = {
         nombres: $('#empleado-nombres').val(),
         apellidos: $('#empleado-apellidos').val(),
-        sueldo_base: $('#empleado-sueldo').val(),
+        sueldo: sueldoValor,
+        sueldo_base: sueldoValor,
         fecha_nacimiento: $('#empleado-nacimiento').val(),
         cedula: $('#empleado-cedula').val(),
         sexo: $('#empleado-sexo').val(),
@@ -111,8 +129,8 @@ function renderEmpleadoRow(empleado) {
         <td class="py-3 px-4">${empleado.id}</td>
         <td class="py-3 px-4">${empleado.nombres}</td>
         <td class="py-3 px-4">${empleado.apellidos}</td>
-        <td class="py-3 px-4">C$${parseFloat(empleado.sueldo_base || 0).toFixed(2)}</td>
-        <td class="py-3 px-4">${empleado.fecha_nacimiento || ''}</td>
+        <td class="py-3 px-4">C$${parseFloat(getEmpleadoSueldo(empleado)).toFixed(2)}</td>
+        <td class="py-3 px-4">${empleado.fecha_nacimiento || empleado.nacimiento || ''}</td>
         <td class="py-3 px-4">${empleado.cedula || ''}</td>
         <td class="py-3 px-4">${empleado.sexo || ''}</td>
         <td class="py-3 px-4">${empleado.estado_civil || ''}</td>

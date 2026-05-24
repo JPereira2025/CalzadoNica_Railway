@@ -21,7 +21,6 @@ window.idCounters = {
 $(document).ready(function() {
     checkSession();
     setupEventListeners();
-    loadDashboardStats();
     setupCarousel();
 });
 
@@ -45,10 +44,25 @@ function setupEventListeners() {
 
     // Navegación: delegación segura
     $(document).on("click", "a.sidebar-link", handleNavigation);
+    $(document).on("click", "#mobile-menu-toggle", function(e) {
+        e.preventDefault();
+        toggleMobileSidebar();
+    });
+    $(document).on("click", "#mobile-back-button", function(e) {
+        e.preventDefault();
+        navigateTo('dashboard');
+    });
 
     // Modales
     $(document).on("click", ".modal-close", function() {
         $(this).closest('.modal').fadeOut(200);
+    });
+
+    // Cerrar menú móvil al redimensionar a pantallas grandes
+    $(window).on('resize', function() {
+        if (window.innerWidth >= 768) {
+            $("#sidebar").removeClass("sidebar-open");
+        }
     });
 
     // Módulos

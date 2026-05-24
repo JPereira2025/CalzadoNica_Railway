@@ -61,4 +61,26 @@ function navigateTo(page) {
     if (typeof applyRolePermissions === 'function') {
         applyRolePermissions();
     }
+
+    updateMobileBackButton(page);
+    closeMobileSidebar();
 }
+
+function toggleMobileSidebar() {
+    $("#sidebar").toggleClass("sidebar-open");
+}
+
+function closeMobileSidebar() {
+    if (window.innerWidth < 768) {
+        $("#sidebar").removeClass("sidebar-open");
+    }
+}
+
+function updateMobileBackButton(page) {
+    if (page && page !== 'dashboard') {
+        $("#mobile-back-button").removeClass("hidden");
+    } else {
+        $("#mobile-back-button").addClass("hidden");
+    }
+}
+

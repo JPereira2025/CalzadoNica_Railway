@@ -7,6 +7,7 @@
 // 5. handleLogout(): cierra sesión y regresa al login.
 
 let currentUser = null;
+let authToken = null;
 
 function normalizeRoleClient(role) {
     const map = {
@@ -24,14 +25,19 @@ function normalizeRoleClient(role) {
  */
 function checkSession() {
     const savedUser = sessionStorage.getItem('currentUser');
-    if (savedUser) {
+    const savedToken = sessionStorage.getItem('authToken');
+
+    if (savedUser && savedToken) {
         currentUser = JSON.parse(savedUser);
+        authToken = savedToken;
         if (currentUser && currentUser.role) {
             currentUser.role = normalizeRoleClient(currentUser.role);
         }
         showApp();
         navigateTo('dashboard');
     } else {
+        sessionStorage.removeItem('currentUser');
+        sessionStorage.removeItem('authToken');
         showLogin();
     }
 }
@@ -45,6 +51,17 @@ function showApp() {
     $("#app").fadeIn(200);
     $("#user-name").text(currentUser.username);
     $("#user-role").text(currentUser.role);
+
+    if (authToken) {
+        $("#tokenValue").text(authToken);
+        $("#tokenContainer").removeClass("hidden");
+    } else {
+        $("#tokenContainer").addClass("hidden");
+    }
+
+    if (typeof loadDashboardStats === 'function') {
+        loadDashboardStats();
+    }
 }
 
 function isAdminUser() {
@@ -70,13 +87,15 @@ function applyRolePermissions() {
 
     if (!isAdminUser()) {
         $(adminOnlyButtons).hide();
-        $(adminQuickPanel).hide();
+        $(adminQuickPanel).show();
+        $('#admin-quick-actions-note').removeClass('hidden');
         $(adminTableButtons).remove();
         $(facturaControls).prop('disabled', true);
         $(facturaInputs).prop('disabled', true);
     } else {
         $(adminOnlyButtons).show();
         $(adminQuickPanel).show();
+        $('#admin-quick-actions-note').addClass('hidden');
         $(facturaControls).prop('disabled', false);
         $(facturaInputs).prop('disabled', false);
     }
@@ -111,12 +130,16 @@ function handleLogin(e) {
 
     apiCall('login.php', 'POST', { username, password })
         .then(response => {
-            if (response.success) {
+            if (response.success && response.token) {
                 currentUser = response.user;
+                authToken = response.token;
+                console.log('Login success token:', authToken);
                 if (currentUser && currentUser.role) {
                     currentUser.role = normalizeRoleClient(currentUser.role);
                 }
                 sessionStorage.setItem('currentUser', JSON.stringify(currentUser));
+                sessionStorage.setItem('authToken', authToken);
+                $("#loginError").addClass('hidden');
                 showNotification(`Bienvenido, ${currentUser.username}!`, "success");
                 showApp();
                 navigateTo('dashboard');
@@ -135,7 +158,9 @@ function handleLogout(e) {
     e.preventDefault();
     apiCall('logout.php', 'POST').always(() => {
         sessionStorage.removeItem('currentUser');
+        sessionStorage.removeItem('authToken');
         currentUser = null;
+        authToken = null;
         window.carritoFactura = [];
         showLogin();
     });

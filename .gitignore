@@ -9,3 +9,4 @@
 uploads/
 config.php
 db/*.sql
+/src/generated/prisma

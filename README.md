@@ -2,66 +2,46 @@
 
 ## Descripción
 
-Sistema de gestión para tienda de calzado. La interfaz principal está en `index.html` y el backend usa los endpoints en `endpoints/`.
+Sistema de gestión para tienda de calzado. La interfaz principal está en `index.html` y el backend actual se ejecuta desde `src/server.js`.
 
 ## Requisitos
 
-- PHP 7.x o 8.x
+- Node.js
 - MySQL / MariaDB
-- XAMPP o un servidor Apache local con PHP
-- Node.js (para el servidor Node.js opcional en `api/` y compilación de Tailwind)
+- XAMPP u otro servidor local para la base de datos
 
 ## Configuración de la base de datos
 
-1. Inicie MySQL desde XAMPP.
-2. Abra `phpMyAdmin` o use la terminal MySQL.
-3. Importe el archivo SQL de la base de datos:
+1. Inicie MySQL.
+2. Importe el archivo SQL de la base de datos:
    - `db/init.sql`
-   - o `dump_real.sql` si ese es su volcado preferido.
 
-> La configuración PHP por defecto en `db_config.php` es:
-> - Host: `localhost`
-> - Usuario: `root`
-> - Contraseña: `` (vacía)
-> - Base de datos: `calzado_nica`
-> - Puerto: `3306`
+> El backend Node utiliza la base de datos `calzado_nica`.
 
-Si su entorno usa credenciales distintas, actualice `db_config.php`.
+## Uso con XAMPP (frontend)
 
-## Uso con XAMPP (recomendado)
-
-1. Asegúrese de que la carpeta `CalzadoNica` esté en `xampp/htdocs`.
+1. Copie la carpeta `CalzadoNica` a `xampp/htdocs`.
 2. En el panel de control de XAMPP, inicie **Apache** y **MySQL**.
 3. Abra en el navegador:
    - `http://localhost/CalzadoNica/index.html`
 
-> La aplicación cliente utiliza los endpoints PHP locales en la carpeta `endpoints/`.
-
-## Servidor Node.js opcional
-
-Este proyecto incluye un servidor Node.js en la carpeta `api/`. Use este backend solo si necesita ejecutar el servidor Node de forma independiente.
+## Servidor Node.js
 
 1. Instale dependencias:
    ```powershell
    npm install
    ```
-2. Cree un archivo `.env` en la raíz si desea personalizar la conexión MySQL:
+2. Cree un archivo `.env` en la raíz si desea personalizar variables:
    ```env
-   DB_HOST=localhost
-   DB_USER=root
-   DB_PASS=
-   DB_NAME=calzado_nica
-   DB_PORT=3307
+   JWT_SECRET=change_this_secret
+   PORT=3001
+   HOST=0.0.0.0
    ```
 3. Inicie el servidor:
    - Producción/local: `npm run start:api`
    - Desarrollo con recarga: `npm run dev:api`
 
-> El servidor Node.js escucha por defecto en `http://localhost:3000`.
-
 ## Compilar Tailwind CSS (opcional)
-
-Si necesita generar o reconstruir CSS con Tailwind:
 
 ```powershell
 npm run build:css
@@ -77,14 +57,12 @@ npm run watch:css
 
 - `index.html`: página principal del sistema.
 - `script.js`: lógica principal del frontend.
-- `js/`: scripts adicionales de interfaz.
-- `endpoints/`: APIs PHP para login, empleados, productos, facturación, usuarios, etc.
-- `db_config.php`: configuración de conexión MySQL para los endpoints PHP.
-- `api/`: servidor Node.js opcional.
+- `js/`: scripts de frontend.
+- `src/`: backend Node.js y lógica de la API.
 - `db/init.sql`: script de creación de base de datos.
 
 ## Notas adicionales
 
-- El frontend actual usa `endpoints/` como ruta base para las peticiones.
+- El backend actual no depende de PHP.
 - Si Apache no carga la página, verifique que no haya otro servicio usando el puerto `80`.
-- Si la base de datos no conecta, revise `db_config.php` y las credenciales de MySQL.
+- El servidor Node.js escucha en `http://localhost:3001` por defecto.

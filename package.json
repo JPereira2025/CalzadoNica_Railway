@@ -5,13 +5,17 @@
   "scripts": {
     "build:css": "node build-tailwind.js",
     "watch:css": "nodemon --watch src/css --exec \"node build-tailwind.js\"",
-    "start:api": "node api/server.js",
-    "dev:api": "nodemon --watch api --exec \"node api/server.js\""
+    "start:api": "node src/server.js",
+    "dev:api": "nodemon --watch src --exec \"node src/server.js\""
   },
   "dependencies": {
+    "@prisma/client": "^4.16.2",
+    "argon2": "^0.44.0",
+    "bcryptjs": "^3.0.3",
     "cors": "^2.8.5",
     "dotenv": "^16.0.0",
     "express": "^4.18.2",
+    "jsonwebtoken": "^9.0.3",
     "mysql2": "^3.15.3"
   },
   "devDependencies": {
@@ -19,6 +23,7 @@
     "autoprefixer": "^10.4.22",
     "nodemon": "^3.1.10",
     "postcss": "^8.5.6",
+    "prisma": "^4.16.2",
     "tailwindcss": "^4.1.17"
   },
   "author": "",
