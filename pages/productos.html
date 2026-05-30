@@ -1,0 +1,58 @@
+<div id="productos-page" class="page hidden">
+<div class="bg-white shadow-md rounded-lg mb-6 p-6">
+<div class="flex flex-wrap justify-between items-center mb-6">
+<h2 class="text-2xl font-bold text-gray-800">Gestión de Productos</h2>
+<div class="flex space-x-2 mt-4 md:mt-0" id="export-buttons-productos">
+<button class="btn-export bg-green-500 hover:bg-green-600 text-white py-2 px-3 rounded-lg transition-colors flex items-center gap-2" data-table-id="productos-table-body" data-type="xlsx" title="Exportar a Excel"><i class="fas fa-file-excel"></i></button>
+<button class="btn-export bg-red-500 hover:bg-red-600 text-white py-2 px-3 rounded-lg transition-colors flex items-center gap-2" data-table-id="productos-table-body" data-type="pdf" title="Exportar a PDF"><i class="fas fa-file-pdf"></i></button>
+<button class="btn-print bg-gray-500 hover:bg-gray-600 text-white py-2 px-3 rounded-lg transition-colors flex items-center gap-2" data-table-id="productos-table-body" title="Imprimir"><i class="fas fa-print"></i></button>
+<button id="btn-add-producto" class="bg-indigo-600 hover:bg-indigo-700 text-white py-2 px-4 rounded-lg transition-colors flex items-center gap-2">
+<i class="fas fa-plus"></i> Nuevo Producto
+</button>
+</div>
+</div>
+<!-- Modal: Gestionar imágenes de producto -->
+<div id="modal-imagenes-producto" class="modal hidden">
+	<div class="modal-content max-w-2xl">
+		<button class="modal-close" onclick="$('#modal-imagenes-producto').fadeOut(200)">&times;</button>
+		<h3 class="text-lg font-semibold mb-3">Imágenes del producto <span id="modal-prod-id" class="font-mono text-sm"></span></h3>
+		<div id="imagenes-list" class="grid grid-cols-3 gap-3 mb-4"></div>
+
+		<form id="form-upload-imagen" class="bg-gray-50 p-3 rounded">
+			<div class="mb-2">
+				<label class="block text-sm font-medium">Archivo de imagen</label>
+				<input type="file" id="upload-imagen-file" accept="image/*" required />
+			</div>
+			<div class="flex items-center gap-3 mb-2">
+				<label><input type="checkbox" id="upload-imagen-principal" /> Marcar como principal</label>
+				<label>Orden: <input type="number" id="upload-imagen-orden" value="0" class="w-20 inline-block ml-2" /></label>
+			</div>
+			<div>
+				<button type="submit" class="btn-submit bg-blue-600 text-white py-2 px-4 rounded">Subir Imagen</button>
+			</div>
+		</form>
+	</div>
+</div>
+<div class="overflow-x-auto">
+<table class="min-w-full bg-white border border-gray-200">
+<thead>
+<tr>
+<th class="py-3 px-4 bg-gray-100 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">ID Producto</th>
+<th class="py-3 px-4 bg-gray-100 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">Marca</th>
+<th class="py-3 px-4 bg-gray-100 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">Modelo</th>
+<th class="py-3 px-4 bg-gray-100 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">Talla</th>
+<th class="py-3 px-4 bg-gray-100 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">Color</th>
+<th class="py-3 px-4 bg-gray-100 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">Precio</th>
+<th class="py-3 px-4 bg-gray-100 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">Stock</th>
+<th class="py-3 px-4 bg-gray-100 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">Categoría</th>
+<th class="py-3 px-4 bg-gray-100 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">Estilo</th>
+<th class="py-3 px-4 bg-gray-100 text-center text-xs font-medium text-gray-600 uppercase tracking-wider">Acciones</th>
+</tr>
+</thead>
+<tbody id="productos-table-body" class="divide-y divide-gray-200">
+<!-- Los productos se cargarán dinámicamente -->
+</tbody>
+</table>
+</div>
+</div>
+</div>

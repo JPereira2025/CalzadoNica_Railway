@@ -10,7 +10,7 @@
  * Configura los listeners para el módulo de empleados
  */
 function setupEmpleadosListeners() {
-    $('#btn-add-empleado').on('click', () => {
+    $(document).on('click', '#btn-add-empleado', () => {
         if (ensureAdminAction('crear un empleado')) openEmpleadoModal();
     });
     $(document).on('click', '.btn-edit-empleado', function() {
@@ -26,20 +26,93 @@ function setupEmpleadosListeners() {
             });
         }
     });
-    $('#form-empleado').on('submit', handleEmpleadoSubmit);
+    $(document).on('input', '#empleado-cedula', function() {
+        $(this).val(maskCedulaInput($(this).val()));
+    });
+    $(document).on('paste', '#empleado-cedula', function() {
+        const $input = $(this);
+        setTimeout(() => {
+            $input.val(maskCedulaInput($input.val()));
+        }, 0);
+    });
+    $(document).on('blur', '#empleado-cedula', function() {
+        $(this).val(maskCedulaInput($(this).val()));
+    });
+    $(document).on('submit', '#form-empleado', handleEmpleadoSubmit);
 }
 
 /**
  * Carga la lista de empleados
  */
+/**
+ * Helper: convierte varios formatos de fecha a ISO `yyyy-mm-dd` para inputs
+ */
+function parseDateToISO(dateVal) {
+    if (!dateVal) return '';
+    // Si ya es un objeto Date
+    if (dateVal instanceof Date) {
+        const y = dateVal.getFullYear();
+        const m = String(dateVal.getMonth() + 1).padStart(2, '0');
+        const d = String(dateVal.getDate()).padStart(2, '0');
+        return `${y}-${m}-${d}`;
+    }
+    // Si viene como ISO completo o con hora
+    const asString = String(dateVal);
+    // Aceptar formats como 2026-05-25T00:00:00.000Z o 2026-05-25 00:00:00
+    const isoMatch = asString.match(/(\d{4}-\d{2}-\d{2})/);
+    if (isoMatch) return isoMatch[1];
+    // Aceptar formatos con guiones ya en yyyy-mm-dd
+    const simpleMatch = asString.match(/^(\d{4}-\d{2}-\d{2})$/);
+    if (simpleMatch) return simpleMatch[1];
+    return '';
+}
+
+/**
+ * Helper: convierte ISO `yyyy-mm-dd` a formato de pantalla `dd/mm/yyyy`
+ */
+function formatDateForDisplay(isoDate) {
+    if (!isoDate) return '';
+    const parts = isoDate.split('-');
+    if (parts.length !== 3) return isoDate;
+    return `${parts[2]}/${parts[1]}/${parts[0]}`;
+}
+
+/**
+ * Normaliza y valida cédula: quita timestamps pegados y fuerza mayúscula
+ */
+function formatCedulaRaw(cedula) {
+    if (!cedula) return '';
+    let s = String(cedula).replace(/T\d{2}:\d{2}:\d{2}.*$/i, '').trim();
+    s = s.toUpperCase();
+    return s;
+}
+
+function maskCedulaInput(value) {
+    if (!value) return '';
+    const raw = String(value).toUpperCase().replace(/[^0-9A-Z]/g, '');
+    const part1 = raw.slice(0, 3);
+    const part2 = raw.slice(3, 9);
+    const part3 = raw.slice(9, 13);
+    const part4 = raw.slice(13, 14);
+    let masked = part1;
+    if (part2) masked += '-' + part2;
+    if (part3) masked += '-' + part3;
+    if (part4) masked += part4;
+    return masked;
+}
+
 function normalizeEmpleadoData(empleado) {
     const sueldo = empleado.sueldo_base ?? empleado.sueldo ?? empleado.salario ?? 0;
-    const fechaNacimiento = empleado.fecha_nacimiento ?? empleado.nacimiento ?? '';
+    const rawFecha = empleado.fecha_nacimiento ?? empleado.nacimiento ?? '';
+    const fechaIso = parseDateToISO(rawFecha);
+    const fechaDisplay = fechaIso ? formatDateForDisplay(fechaIso) : '';
     return {
         ...empleado,
         sueldo_base: sueldo,
-        fecha_nacimiento: fechaNacimiento,
-        nacimiento: fechaNacimiento
+        // fecha_nacimiento se mantiene en formato ISO (para inputs y envío al servidor)
+        fecha_nacimiento: fechaIso,
+        nacimiento: fechaIso,
+        fecha_nacimiento_display: fechaDisplay
     };
 }
 
@@ -75,8 +148,9 @@ function openEmpleadoModal(id = null) {
                 $('#empleado-nombres').val(emp.nombres);
                 $('#empleado-apellidos').val(emp.apellidos);
                 $('#empleado-sueldo').val(getEmpleadoSueldo(emp));
-                $('#empleado-nacimiento').val(emp.fecha_nacimiento || emp.nacimiento || '');
-                $('#empleado-cedula').val(emp.cedula);
+                const fechaIso = parseDateToISO(emp.fecha_nacimiento || emp.nacimiento || '');
+                $('#empleado-nacimiento').val(fechaIso);
+                $('#empleado-cedula').val(formatCedulaRaw(emp.cedula));
                 $('#empleado-sexo').val(emp.sexo);
                 $('#empleado-estado').val(emp.estado_civil);
                 $('#empleado-telefono').val(emp.telefono);
@@ -96,13 +170,25 @@ function handleEmpleadoSubmit(e) {
     if (!ensureAdminAction('guardar un empleado')) return;
     const id = $('#empleado-id-form').val();
     const sueldoValor = $('#empleado-sueldo').val();
+    // Normalizar fecha a ISO (yyyy-mm-dd) antes de enviar para evitar corrupción en la BD
+    const fechaInputRaw = $('#empleado-nacimiento').val();
+    const fechaIso = parseDateToISO(fechaInputRaw);
+    // Normalizar y validar cédula antes de enviar
+    const cedulaRaw = $('#empleado-cedula').val() || '';
+    const cedulaFormatted = maskCedulaInput(formatCedulaRaw(cedulaRaw));
+    const cedulaPattern = /^\d{3}-\d{6}-\d{4}[A-Z]$/;
+    if (!cedulaPattern.test(cedulaFormatted)) {
+        showNotification('Formato de cédula inválido. Use 111-111111-1111A', 'error');
+        return;
+    }
+
     const payload = {
         nombres: $('#empleado-nombres').val(),
         apellidos: $('#empleado-apellidos').val(),
         sueldo: sueldoValor,
         sueldo_base: sueldoValor,
-        fecha_nacimiento: $('#empleado-nacimiento').val(),
-        cedula: $('#empleado-cedula').val(),
+        fecha_nacimiento: fechaIso,
+        cedula: cedulaFormatted,
         sexo: $('#empleado-sexo').val(),
         estado_civil: $('#empleado-estado').val(),
         telefono: $('#empleado-telefono').val(),
@@ -124,13 +210,16 @@ function handleEmpleadoSubmit(e) {
  * Renderiza una fila de empleado
  */
 function renderEmpleadoRow(empleado) {
+    const fechaRaw = empleado.fecha_nacimiento ?? empleado.nacimiento ?? '';
+    const fechaIso = parseDateToISO(fechaRaw);
+    const fechaDisplay = fechaIso ? formatDateForDisplay(fechaIso) : (empleado.fecha_nacimiento_display || '');
     return `
     <tr data-id="${empleado.id}">
         <td class="py-3 px-4">${empleado.id}</td>
         <td class="py-3 px-4">${empleado.nombres}</td>
         <td class="py-3 px-4">${empleado.apellidos}</td>
         <td class="py-3 px-4">C$${parseFloat(getEmpleadoSueldo(empleado)).toFixed(2)}</td>
-        <td class="py-3 px-4">${empleado.fecha_nacimiento || empleado.nacimiento || ''}</td>
+        <td class="py-3 px-4">${fechaDisplay}</td>
         <td class="py-3 px-4">${empleado.cedula || ''}</td>
         <td class="py-3 px-4">${empleado.sexo || ''}</td>
         <td class="py-3 px-4">${empleado.estado_civil || ''}</td>
@@ -152,6 +241,8 @@ function generateEmpleadoId(payload) {
     const apellidos = payload.apellidos ? payload.apellidos.split(' ') : ['X', 'X'];
     const apellido1 = apellidos[0] ? apellidos[0].substring(0, 1).toUpperCase() : 'X';
     const apellido2 = apellidos[1] ? apellidos[1].substring(0, 1).toUpperCase() : 'X';
-    const fechaFormateada = payload.fecha_nacimiento ? payload.fecha_nacimiento.replace(/-/g, '') : '00000000';
-    return `EMP-${nombre1}${apellido1}${apellido2}-${fechaFormateada}`;
+    const fechaFormateada = payload.fecha_nacimiento ? payload.fecha_nacimiento.replace(/-/g, '') : '';
+    const parts = [`EMP`, `${nombre1}${apellido1}${apellido2}`];
+    if (fechaFormateada) parts.push(fechaFormateada);
+    return parts.join('-');
 }

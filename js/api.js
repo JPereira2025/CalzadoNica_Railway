@@ -7,6 +7,8 @@ function mapEndpoint(endpoint) {
     const [path, qs] = endpoint.split('?');
     const mapping = {
         'login.php': 'login',
+        'register.php': 'register',
+        'verify-token.php': 'verify-token',
         'logout.php': 'logout',
         'empleados.php': 'api/empleados',
         'productos.php': 'api/productos',

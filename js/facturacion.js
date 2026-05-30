@@ -13,23 +13,22 @@ let descuentoAplicado = { porcentaje: 0, codigo: '' };
  * Configura los listeners para el módulo de facturación
  */
 function setupFacturacionListeners() {
-    $('#btn-nueva-factura').on('click', function() {
-        if (ensureAdminAction('iniciar una factura')) resetFacturaForm();
+    $(document).on('click', '#btn-nueva-factura', function() {
+        resetFacturaForm();
     });
-    $('#btn-agregar-producto-factura').on('click', function() {
-        if (ensureAdminAction('agregar un producto a la factura')) agregarProductoAFactura();
+    $(document).on('click', '#btn-agregar-producto-factura', function() {
+        agregarProductoAFactura();
     });
     $(document).on('click', '.btn-eliminar-item-factura', function() {
-        if (!ensureAdminAction('eliminar un item de la factura')) return;
         carritoFactura.splice($(this).data('index'), 1);
         renderizarTablaFactura();
     });
-    $(document).on('click', '#btn-aplicar-codigo', function(e) { e.preventDefault(); if (ensureAdminAction('aplicar un código de descuento')) aplicarCodigoDescuento(); });
-    $('#factura-descuento').on('keypress', function(e) { if (e.which === 13) { e.preventDefault(); if (ensureAdminAction('aplicar un código de descuento')) aplicarCodigoDescuento(); } });
-    $('#factura-iva').on('change', calcularTotales);
-    $('#form-factura').on('submit', guardarFactura);
-    $('#btn-cancelar-factura').on('click', function() {
-        if (ensureAdminAction('cancelar la factura')) resetFacturaForm();
+    $(document).on('click', '#btn-aplicar-codigo', function(e) { e.preventDefault(); aplicarCodigoDescuento(); });
+    $(document).on('keypress', '#factura-descuento', function(e) { if (e.which === 13) { e.preventDefault(); aplicarCodigoDescuento(); } });
+    $(document).on('change', '#factura-iva', calcularTotales);
+    $(document).on('submit', '#form-factura', guardarFactura);
+    $(document).on('click', '#btn-cancelar-factura', function() {
+        resetFacturaForm();
     });
     $(document).on('click', '.btn-ver-factura', function() { verFactura($(this).data('id')); });
     $(document).on('click', '.btn-eliminar-factura', function() {
@@ -41,12 +40,31 @@ function setupFacturacionListeners() {
 /**
  * Carga la lista de facturas
  */
-function loadFacturas() {
+function loadFacturas(callback) {
     apiCall('facturas.php').done(data => {
+        updateFacturaIdCounter(data);
         renderTable('facturas-table-body', data, renderFacturaRow);
+        if (typeof callback === 'function') callback();
     }).fail(() => {
         showNotification('No se pudieron cargar las facturas guardadas.', 'error');
+        if (typeof callback === 'function') callback();
     });
+}
+
+/**
+ * Actualiza el contador de facturas con base en los IDs existentes.
+ */
+function updateFacturaIdCounter(facturas) {
+    const facturasList = normalizeList(facturas);
+    const maxCounter = facturasList.reduce((max, factura) => {
+        const idString = String(factura.id || '');
+        const match = idString.match(/^FACT(\d+)/i);
+        const value = match ? parseInt(match[1], 10) : parseInt(idString.replace(/\D/g, ''), 10);
+        if (!Number.isFinite(value)) return max;
+        return Math.max(max, value);
+    }, 0);
+    window.idCounters = window.idCounters || {};
+    window.idCounters.facturas = maxCounter + 1;
 }
 
 /**
@@ -68,7 +86,6 @@ function resetFacturaForm() {
  * Agrega un producto al carrito
  */
 function agregarProductoAFactura() {
-    if (!ensureAdminAction('agregar un producto a la factura')) return;
     const productoId = $("#factura-producto-select").val();
     const cantidad = parseInt($("#factura-cantidad").val()) || 0;
     if (!productoId || cantidad <= 0) {
@@ -128,7 +145,6 @@ function calcularTotales() {
  * Aplica un código de descuento
  */
 function aplicarCodigoDescuento() {
-    if (!ensureAdminAction('aplicar un código de descuento')) return;
     const codigoIngresado = $("#factura-descuento").val().trim().toUpperCase();
     if (!codigoIngresado) {
         descuentoAplicado = { porcentaje: 0, codigo: '' };
@@ -136,10 +152,20 @@ function aplicarCodigoDescuento() {
         calcularTotales();
         return;
     }
-    const codigoValido = codigosDescuento.find(c => c.codigo.toUpperCase() === codigoIngresado);
-    if (codigoValido && codigoValido.estado == 1) {
-        const hoy = new Date().toISOString().split('T')[0];
-        if (codigoValido.fecha_inicio <= hoy && codigoValido.fecha_fin >= hoy) {
+    const codigoValido = codigosDescuento.find(c => String(c.codigo).toUpperCase() === codigoIngresado);
+    if (codigoValido && Number(codigoValido.estado) == 1) {
+        // Normalizar fechas y comparar solo la parte de fecha (sin horas)
+        const hoyDate = new Date();
+        const hoy = new Date(hoyDate.getFullYear(), hoyDate.getMonth(), hoyDate.getDate());
+        const parseDateOnly = v => {
+            if (!v) return null;
+            const d = new Date(v);
+            if (isNaN(d)) return null;
+            return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+        };
+        const inicio = parseDateOnly(codigoValido.fecha_inicio);
+        const fin = parseDateOnly(codigoValido.fecha_fin);
+        if (inicio && fin && inicio <= hoy && fin >= hoy) {
             descuentoAplicado = { porcentaje: parseFloat(codigoValido.porcentaje_descuento), codigo: codigoValido.codigo };
             showNotification(`Código "${codigoValido.codigo}" aplicado!`, 'success');
         } else {
@@ -156,7 +182,6 @@ function aplicarCodigoDescuento() {
  */
 function guardarFactura(e) {
     e.preventDefault();
-    if (!ensureAdminAction('guardar una factura')) return;
     if (carritoFactura.length === 0) {
         showNotification("Agregue productos a la factura.", "error");
         return;
@@ -171,16 +196,15 @@ function guardarFactura(e) {
     const fechaLocal = `${year}-${month}-${day} ${hour}:${minute}:${second}`;
 
     const facturaData = {
+        id: $("#factura-numero").val(),
         cliente: $("#factura-cliente").val(),
         vendedor: $("#factura-vendedor").val(),
-        fecha: fechaLocal,
         items: carritoFactura,
-        descuento_codigo: descuentoAplicado.codigo || null,
+        codigo_descuento: descuentoAplicado.codigo || null,
         descuento_porcentaje: descuentoAplicado.porcentaje,
-        aplica_iva: $("#factura-iva").is(':checked'),
+        iva: $("#factura-iva").is(':checked') ? 1 : 0,
         subtotal: $("#factura-subtotal").text().replace('C$', ''),
         monto_descuento: $("#factura-monto-descuento").text().replace('-C$', ''),
-        iva: $("#factura-iva-monto").text().replace('C$', ''),
         total: $("#factura-total").text().replace('C$', '')
     };
     apiCall('facturas.php', 'POST', facturaData).done(resp => {

@@ -80,10 +80,23 @@ model productos {
   estilo_id     String?         @db.VarChar(20)
   precio        Decimal         @db.Decimal(10, 2)
   stock         Int
+  imagenes      producto_imagenes[]
   factura_items factura_items[]
+  pedido_items  pedido_items[]
 
   @@index([categoria_id], map: "categoria_id")
   @@index([estilo_id], map: "estilo_id")
+}
+
+model producto_imagenes {
+  id         Int        @id @default(autoincrement())
+  producto_id String    @db.VarChar(50)
+  url        String     @db.VarChar(500)
+  es_principal Boolean  @default(false)
+  orden      Int        @default(0)
+  productos  productos  @relation(fields: [producto_id], references: [id], onDelete: Cascade)
+
+  @@index([producto_id], map: "producto_id")
 }
 
 /// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
@@ -106,6 +119,10 @@ model usuarios {
   username String        @unique(map: "username") @db.VarChar(50)
   password String        @db.VarChar(255)
   role     usuarios_role
+  email    String?       @unique(map: "email") @db.VarChar(255)
+  verified Boolean      @default(false)
+  verification_token String? @db.VarChar(500)
+  verification_token_expiry DateTime? @db.DateTime(0)
 }
 
 enum usuarios_role {
@@ -118,4 +135,64 @@ enum empleados_sexo {
   Masculino
   Femenino
   Otro
+}
+
+model clientes {
+  id              Int           @id @default(autoincrement())
+  email           String        @unique(map: "email") @db.VarChar(255)
+  password        String        @db.VarChar(255)
+  nombres         String        @db.VarChar(100)
+  apellidos       String        @db.VarChar(100)
+  telefono        String?       @db.VarChar(20)
+  fecha_registro  DateTime      @default(now()) @db.DateTime(0)
+  verificado      Boolean       @default(false)
+  token_verificacion String?    @db.VarChar(500)
+  token_expiry    DateTime?     @db.DateTime(0)
+  pedidos         pedidos[]
+  direcciones     direcciones[]
+}
+
+model direcciones {
+  id          Int      @id @default(autoincrement())
+  cliente_id  Int
+  nombre      String   @db.VarChar(100)
+  telefono    String   @db.VarChar(20)
+  provincia   String   @db.VarChar(100)
+  ciudad      String   @db.VarChar(100)
+  direccion_exacta String @db.Text
+  es_predeterminada Boolean @default(false)
+  clientes    clientes @relation(fields: [cliente_id], references: [id], onDelete: Cascade)
+
+  @@index([cliente_id], map: "cliente_id")
+}
+
+model pedidos {
+  id              Int           @id @default(autoincrement())
+  cliente_id      Int
+  fecha           DateTime      @default(now()) @db.DateTime(0)
+  estado          String        @db.VarChar(50) // pendiente, confirmado, enviado, entregado, cancelado
+  subtotal        Decimal       @db.Decimal(10, 2)
+  monto_descuento Decimal       @default(0.00) @db.Decimal(10, 2)
+  codigo_descuento String?      @db.VarChar(50)
+  total           Decimal       @db.Decimal(10, 2)
+  metodo_pago     String        @db.VarChar(50)
+  notas           String?       @db.Text
+  cliente         clientes      @relation(fields: [cliente_id], references: [id])
+  items           pedido_items[]
+
+  @@index([cliente_id], map: "cliente_id")
+}
+
+model pedido_items {
+  id              Int       @id @default(autoincrement())
+  pedido_id       Int
+  producto_id     String    @db.VarChar(50)
+  nombre_producto String    @db.VarChar(255)
+  cantidad        Int
+  precio_unitario Decimal   @db.Decimal(10, 2)
+  pedidos         pedidos   @relation(fields: [pedido_id], references: [id], onDelete: Cascade)
+  productos       productos @relation(fields: [producto_id], references: [id])
+
+  @@index([pedido_id], map: "pedido_id")
+  @@index([producto_id], map: "producto_id")
 }

@@ -10,7 +10,7 @@
  * Configura los listeners para el módulo de productos
  */
 function setupProductosListeners() {
-    $('#btn-add-producto').on('click', () => {
+    $(document).on('click', '#btn-add-producto', () => {
         if (ensureAdminAction('crear un producto')) openProductoModal();
     });
     $(document).on('click', '.btn-edit-producto', function() {
@@ -26,7 +26,9 @@ function setupProductosListeners() {
             });
         }
     });
-    $('#form-producto').on('submit', handleProductoSubmit);
+    $(document).on('submit', '#form-producto', handleProductoSubmit);
+    // listeners para gestionar imágenes
+    setupImagesListeners();
 }
 
 /**
@@ -147,11 +149,104 @@ function renderProductoRow(producto) {
         <td class="py-3 px-4">${producto.categoria_nombre || ''}</td>
         <td class="py-3 px-4">${producto.estilo_nombre || ''}</td>
         <td class="py-3 px-4 text-center">
-            <button class="btn-edit-producto text-indigo-600 hover:text-indigo-800 mx-1" title="Editar"><i class="fas fa-edit"></i></button>
-            <button class="btn-delete-producto text-red-600 hover:text-red-800 mx-1" title="Eliminar"><i class="fas fa-trash-alt"></i></button>
+                <button class="btn-edit-producto text-indigo-600 hover:text-indigo-800 mx-1" title="Editar"><i class="fas fa-edit"></i></button>
+                <button class="btn-delete-producto text-red-600 hover:text-red-800 mx-1" title="Eliminar"><i class="fas fa-trash-alt"></i></button>
+                <button class="btn-images-producto text-green-600 hover:text-green-800 mx-1" title="Imágenes"><i class="fas fa-image"></i></button>
         </td>
     </tr>`;
 }
+
+    // --- Imágenes: handlers y UI ---
+    function setupImagesListeners() {
+        // abrir modal de imágenes
+        $(document).on('click', '.btn-images-producto', function() {
+            const id = $(this).closest('tr').data('id');
+            if (!ensureAdminAction('gestionar imágenes')) return;
+            openImagesModal(id);
+        });
+
+        // subir imagen
+        $(document).on('submit', '#form-upload-imagen', function(e) {
+            e.preventDefault();
+            const prodId = $('#modal-prod-id').text();
+            const fileEl = document.getElementById('upload-imagen-file');
+            if (!fileEl || !fileEl.files || !fileEl.files.length) {
+                showNotification('Seleccione un archivo', 'error');
+                return;
+            }
+            const fd = new FormData();
+            fd.append('imagen', fileEl.files[0]);
+            fd.append('es_principal', $('#upload-imagen-principal').is(':checked') ? '1' : '0');
+            fd.append('orden', $('#upload-imagen-orden').val() || 0);
+
+            const token = sessionStorage.getItem('authToken');
+            $.ajax({
+                url: mapEndpoint(`api/productos/${prodId}/imagenes`),
+                method: 'POST',
+                data: fd,
+                processData: false,
+                contentType: false,
+                headers: { 'Authorization': token ? 'Bearer ' + token : '' }
+            }).done(resp => {
+                showNotification('Imagen subida', 'success');
+                $('#upload-imagen-file').val('');
+                loadImagesForProduct(prodId);
+            }).fail((xhr) => {
+                showNotification('Error subiendo imagen', 'error');
+                console.error('Upload error', xhr.responseText || xhr);
+            });
+        });
+
+        // eliminar imagen
+        $(document).on('click', '.btn-delete-imagen', function() {
+            if (!confirm('¿Eliminar imagen?')) return;
+            const imgId = $(this).data('imgid');
+            const prodId = $('#modal-prod-id').text();
+            const token = sessionStorage.getItem('authToken');
+            $.ajax({ url: mapEndpoint(`api/productos/${prodId}/imagenes/${imgId}`), method: 'DELETE', headers: { 'Authorization': token ? 'Bearer ' + token : '' } })
+            .done(() => { showNotification('Imagen eliminada', 'success'); loadImagesForProduct(prodId); })
+            .fail((xhr) => { showNotification('Error eliminando imagen', 'error'); console.error(xhr.responseText||xhr); });
+        });
+
+        // marcar principal
+        $(document).on('click', '.btn-set-principal', function() {
+            const imgId = $(this).data('imgid');
+            const prodId = $('#modal-prod-id').text();
+            const token = sessionStorage.getItem('authToken');
+            $.ajax({ url: mapEndpoint(`api/productos/${prodId}/imagenes/${imgId}/principal`), method: 'POST', headers: { 'Authorization': token ? 'Bearer ' + token : '' } })
+            .done(() => { showNotification('Imagen marcada como principal', 'success'); loadImagesForProduct(prodId); loadProductos(); })
+            .fail((xhr) => { showNotification('Error marcando principal', 'error'); console.error(xhr.responseText||xhr); });
+        });
+    }
+
+    function openImagesModal(prodId) {
+        $('#modal-prod-id').text(prodId);
+        $('#modal-imagenes-producto').fadeIn(200);
+        loadImagesForProduct(prodId);
+    }
+
+    function loadImagesForProduct(prodId) {
+        const token = sessionStorage.getItem('authToken');
+        $.ajax({ url: mapEndpoint(`api/productos/${prodId}/imagenes`), method: 'GET', headers: { 'Authorization': token ? 'Bearer ' + token : '' } })
+        .done((imgs) => {
+            const $list = $('#imagenes-list');
+            $list.empty();
+            if (!imgs || !imgs.length) {
+                $list.append('<div class="col-span-3 text-sm text-gray-600">No hay imágenes.</div>');
+                return;
+            }
+            imgs.forEach(img => {
+                const thumb = `<div class="border p-2 rounded relative">
+                    <img src="${img.url}" class="w-full h-32 object-cover rounded mb-2" />
+                    <div class="flex justify-between gap-2">
+                      <button class="btn-set-principal bg-blue-600 text-white py-1 px-2 rounded text-sm" data-imgid="${img.id}">${img.es_principal? 'Principal' : 'Marcar'}</button>
+                      <button class="btn-delete-imagen bg-red-600 text-white py-1 px-2 rounded text-sm" data-imgid="${img.id}">Eliminar</button>
+                    </div>
+                </div>`;
+                $list.append(thumb);
+            });
+        }).fail((xhr) => { showNotification('Error cargando imágenes', 'error'); console.error(xhr.responseText||xhr); });
+    }
 
 /**
  * Genera ID único para producto

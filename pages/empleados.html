@@ -1,0 +1,38 @@
+<div id="empleados-page" class="page hidden">
+<div class="bg-white shadow-md rounded-lg mb-6 p-6">
+<div class="flex flex-wrap justify-between items-center mb-6">
+<h2 class="text-2xl font-bold text-gray-800">Gestión de Empleados</h2>
+<div class="flex space-x-2 mt-4 md:mt-0" id="export-buttons-empleados">
+<button class="btn-export bg-green-500 hover:bg-green-600 text-white py-2 px-3 rounded-lg transition-colors flex items-center gap-2" data-table-id="empleados-table-body" data-type="xlsx" title="Exportar a Excel"><i class="fas fa-file-excel"></i></button>
+<button class="btn-export bg-red-500 hover:bg-red-600 text-white py-2 px-3 rounded-lg transition-colors flex items-center gap-2" data-table-id="empleados-table-body" data-type="pdf" title="Exportar a PDF"><i class="fas fa-file-pdf"></i></button>
+<button class="btn-print bg-gray-500 hover:bg-gray-600 text-white py-2 px-3 rounded-lg transition-colors flex items-center gap-2" data-table-id="empleados-table-body" title="Imprimir"><i class="fas fa-print"></i></button>
+<button id="btn-add-empleado" class="bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg transition-colors flex items-center gap-2">
+<i class="fas fa-plus"></i> Nuevo Empleado
+</button>
+</div>
+</div>
+<div class="overflow-x-auto">
+<table class="min-w-full bg-white border border-gray-200">
+<thead>
+<tr>
+<th class="py-3 px-4 bg-gray-100 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">ID Empleado</th>
+<th class="py-3 px-4 bg-gray-100 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">Nombres</th>
+<th class="py-3 px-4 bg-gray-100 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">Apellidos</th>
+<th class="py-3 px-4 bg-gray-100 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">Sueldo Base</th>
+<th class="py-3 px-4 bg-gray-100 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">Fecha Nacimiento</th>
+<th class="py-3 px-4 bg-gray-100 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">Cédula</th>
+<th class="py-3 px-4 bg-gray-100 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">Sexo</th>
+<th class="py-3 px-4 bg-gray-100 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">Estado Civil</th>
+<th class="py-3 px-4 bg-gray-100 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">Teléfono</th>
+<th class="py-3 px-4 bg-gray-100 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">Dirección</th>
+<th class="py-3 px-4 bg-gray-100 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">Cargo</th>
+<th class="py-3 px-4 bg-gray-100 text-center text-xs font-medium text-gray-600 uppercase tracking-wider">Acciones</th>
+</tr>
+</thead>
+<tbody id="empleados-table-body" class="divide-y divide-gray-200">
+<!-- Los empleados se cargarán dinámicamente -->
+</tbody>
+</table>
+</div>
+</div>
+</div>

@@ -16,47 +16,37 @@ function handleNavigation(e) {
 /**
  * Navega a una página específica
  */
-function navigateTo(page) {
-    if (!page) page = 'dashboard';
-    
+function loadPage(page, callback) {
+    const pageElement = $(`#${page}-page`);
+    if (pageElement.length) {
+        if (typeof callback === 'function') callback();
+        return;
+    }
+
+    $("#page-content").html('<div class="text-center py-20 text-gray-500">Cargando módulo...</div>');
+    fetch(`pages/${page}.html`, { cache: 'no-store' })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status} ${response.statusText}`);
+            }
+            return response.text();
+        })
+        .then(html => {
+            $("#page-content").html(html);
+            if (typeof callback === 'function') callback();
+        })
+        .catch(error => {
+            $("#page-content").html(`<div class="text-center py-20 text-red-600">No se pudo cargar el módulo '${page}'. ${error.message}</div>`);
+            console.error('Error loading page:', page, error);
+        });
+}
+
+function showPage(page) {
     $(".page").hide();
     $(`#${page}-page`).show();
     $("#page-title").text(capitalizeFirstLetter(page.replace('-', ' ')));
     $(".sidebar-link").removeClass("active");
     $(`a[href="#${page}"]`).addClass("active");
-
-    // Cargar datos específicos de la página
-    switch (page) {
-        case 'dashboard':
-            loadDashboardStats();
-            break;
-        case 'empleados':
-            loadEmpleados();
-            break;
-        case 'categorias':
-            loadCategorias();
-            break;
-        case 'estilos':
-            loadEstilos();
-            break;
-        case 'productos':
-            loadProductos();
-            break;
-        case 'codigos':
-            loadCodigos();
-            break;
-        case 'usuarios':
-            loadUsuarios();
-            break;
-        case 'facturacion':
-            loadCodigos(() => {
-                loadProductos(() => {
-                    resetFacturaForm();
-                    loadFacturas();
-                });
-            });
-            break;
-    }
 
     if (typeof applyRolePermissions === 'function') {
         applyRolePermissions();
@@ -64,6 +54,59 @@ function navigateTo(page) {
 
     updateMobileBackButton(page);
     closeMobileSidebar();
+}
+
+function initPage(page) {
+    if (page === 'dashboard') {
+        setupCarousel();
+    }
+}
+
+function navigateTo(page, callback) {
+    if (!page) page = 'dashboard';
+
+    loadPage(page, function() {
+        showPage(page);
+        initPage(page);
+
+        if (typeof callback === 'function') {
+            callback();
+        }
+
+        // Cargar datos específicos de la página
+        switch (page) {
+            case 'dashboard':
+                loadDashboardStats();
+                break;
+            case 'empleados':
+                loadEmpleados();
+                break;
+            case 'categorias':
+                loadCategorias();
+                break;
+            case 'estilos':
+                loadEstilos();
+                break;
+            case 'productos':
+                loadProductos();
+                break;
+            case 'codigos':
+                loadCodigos();
+                break;
+            case 'usuarios':
+                loadUsuarios();
+                break;
+            case 'facturacion':
+                loadCodigos(() => {
+                    loadProductos(() => {
+                        loadFacturas(() => {
+                            resetFacturaForm();
+                        });
+                    });
+                });
+                break;
+        }
+    });
 }
 
 function toggleMobileSidebar() {

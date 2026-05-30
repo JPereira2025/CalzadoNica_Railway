@@ -8,11 +8,25 @@
 
 let codigosDescuento = [];
 
+function formatDateForInput(value) {
+    if (!value) return '';
+    const d = new Date(value);
+    if (isNaN(d)) return String(value).split('T')[0] || '';
+    return d.toISOString().split('T')[0];
+}
+
+function formatDateDisplay(value) {
+    if (!value) return '';
+    const d = new Date(value);
+    if (isNaN(d)) return String(value).split('T')[0] || '';
+    return d.toLocaleDateString('es-NI');
+}
+
 /**
  * Configura los listeners para el módulo de códigos
  */
 function setupCodigosListeners() {
-    $('#btn-add-codigo').on('click', () => {
+    $(document).on('click', '#btn-add-codigo', () => {
         if (ensureAdminAction('crear un código')) openCodigoModal();
     });
     $(document).on('click', '.btn-edit-codigo', function() {
@@ -20,7 +34,12 @@ function setupCodigosListeners() {
     });
     $(document).on('click', '.btn-delete-codigo', function() {
         if (!ensureAdminAction('eliminar un código')) return;
-        const id = $(this).closest('tr').data('id');
+        const $tr = $(this).closest('tr');
+        const id = $tr.attr('data-id') || $tr.data('id');
+        if (!id) {
+            showNotification('ID no encontrado para eliminar el código.', 'error');
+            return;
+        }
         if (confirm('¿Eliminar código?')) {
             apiCall(`codigos.php?id=${id}`, 'DELETE').done(resp => {
                 showNotification(resp.message, 'success');
@@ -28,7 +47,7 @@ function setupCodigosListeners() {
             });
         }
     });
-    $('#form-codigo').on('submit', handleCodigoSubmit);
+    $(document).on('submit', '#form-codigo', handleCodigoSubmit);
 }
 
 /**
@@ -62,10 +81,12 @@ function openCodigoModal(id = null) {
         apiCall(`codigos.php?id=${id}`).done(data => {
             const cod = normalizeList(data)[0];
             if (cod) {
+                const fid = cod.id || cod.codigo;
+                $('#codigo-id-form').val(fid);
                 $('#codigo-codigo').val(cod.codigo);
                 $('#codigo-descuento').val(cod.porcentaje_descuento);
-                $('#codigo-fecha-inicio').val(cod.fecha_inicio);
-                $('#codigo-fecha-fin').val(cod.fecha_fin);
+                $('#codigo-fecha-inicio').val(formatDateForInput(cod.fecha_inicio));
+                $('#codigo-fecha-fin').val(formatDateForInput(cod.fecha_fin));
                 $('#codigo-estado').val(cod.estado);
                 $('#codigo-descripcion').val(cod.descripcion);
             }
@@ -103,6 +124,8 @@ function handleCodigoSubmit(e) {
     };
     if (id) {
         payload.id = id;
+    } else {
+        payload.id = generateCodigoId();
     }
     console.log('Enviar código promocional', payload);
     const method = id ? 'PUT' : 'POST';
@@ -120,13 +143,14 @@ function renderCodigoRow(codigo) {
     const estadoBadge = codigo.estado == 1 
         ? '<span class="px-2 py-1 text-xs rounded-full bg-green-100 text-green-800">Activo</span>' 
         : '<span class="px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-800">Inactivo</span>';
+    const rowId = codigo.id || codigo.codigo || '';
     return `
-    <tr data-id="${codigo.id}">
-        <td class="py-3 px-4">${codigo.id}</td>
+    <tr data-id="${rowId}">
+        <td class="py-3 px-4">${rowId}</td>
         <td class="py-3 px-4 font-mono font-bold">${codigo.codigo}</td>
         <td class="py-3 px-4">${codigo.porcentaje_descuento}%</td>
-        <td class="py-3 px-4">${codigo.fecha_inicio || ''}</td>
-        <td class="py-3 px-4">${codigo.fecha_fin || ''}</td>
+        <td class="py-3 px-4">${formatDateDisplay(codigo.fecha_inicio) || ''}</td>
+        <td class="py-3 px-4">${formatDateDisplay(codigo.fecha_fin) || ''}</td>
         <td class="py-3 px-4">${estadoBadge}</td>
         <td class="py-3 px-4">${codigo.descripcion || ''}</td>
         <td class="py-3 px-4 text-center">

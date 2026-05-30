@@ -10,13 +10,16 @@
  * Configura los listeners para el módulo de usuarios
  */
 function setupUsuariosListeners() {
-    $("#btn-add-usuario").on("click", () => {
+    $(document).on("click", "#btn-add-usuario", function(e) {
+        e.preventDefault();
         if (ensureAdminAction('crear un usuario')) openUsuarioModal();
     });
-    $(document).on("click", ".btn-edit-usuario", function() {
+    $(document).on("click", ".btn-edit-usuario", function(e) {
+        e.preventDefault();
         if (ensureAdminAction('editar un usuario')) openUsuarioModal($(this).closest("tr").data("id"));
     });
-    $(document).on("click", ".btn-delete-usuario", function() {
+    $(document).on("click", ".btn-delete-usuario", function(e) {
+        e.preventDefault();
         if (!ensureAdminAction('eliminar un usuario')) return;
         const id = $(this).closest("tr").data("id");
         if (confirm("¿Eliminar este usuario?")) {
@@ -26,7 +29,10 @@ function setupUsuariosListeners() {
             });
         }
     });
-    $("#form-usuario").on("submit", handleUsuarioSubmit);
+    $(document).on("submit", "#form-usuario", function(e) {
+        e.preventDefault();
+        handleUsuarioSubmit(e);
+    });
 }
 
 /**
@@ -51,11 +57,16 @@ function openUsuarioModal(id = null) {
             const user = normalizeList(data)[0];
             if (user) {
                 $("#usuario-usuario").val(user.username);
+                $("#usuario-email").val(user.email || '');
                 $("#usuario-role").val(user.role);
+                $("#usuario-verified").prop('checked', !!user.verified);
                 $("#usuario-password").attr('placeholder', 'Dejar en blanco para no cambiar');
             }
         });
     } else {
+        $("#usuario-email").val('');
+        $("#usuario-role").val('Vendedor');
+        $("#usuario-verified").prop('checked', false);
         $("#usuario-password").attr('placeholder', '');
     }
     openModal("#modal-usuario");
@@ -68,15 +79,41 @@ function handleUsuarioSubmit(e) {
     e.preventDefault();
     if (!ensureAdminAction('guardar un usuario')) return;
     const id = $("#usuario-id-form").val() || null;
+    const username = $("#usuario-usuario").val().trim();
+    const email = $("#usuario-email").val().trim();
+    const password = $("#usuario-password").val();
+    const role = $("#usuario-role").val();
+    const verified = $("#usuario-verified").is(":checked");
+
+    if (!username || !email || !role) {
+        showNotification('Por favor completa usuario, email y rol.', 'error');
+        return;
+    }
+
+    if (!id && !password) {
+        showNotification('La contraseña es requerida para un nuevo usuario.', 'error');
+        return;
+    }
+
     const userData = {
         id: id,
-        username: $("#usuario-usuario").val(),
-        password: $("#usuario-password").val(),
-        role: $("#usuario-role").val()
+        username,
+        email,
+        role,
+        verified
     };
+
+    if (password) {
+        userData.password = password;
+    }
+
     const method = id ? 'PUT' : 'POST';
     apiCall('usuarios.php', method, userData).done(response => {
         showNotification(response.message, 'success');
+        if (response.verificationToken) {
+            console.log('Verification token generated for user:', response.verificationToken);
+            showNotification('Se generó un token de verificación JWT. Revisa la consola.', 'info');
+        }
         $("#modal-usuario").fadeOut(200);
         loadUsuarios();
     });
@@ -90,7 +127,9 @@ function renderUsuarioRow(usuario) {
     <tr data-id="${usuario.id}">
         <td class="py-3 px-4">${usuario.id}</td>
         <td class="py-3 px-4">${usuario.username}</td>
+        <td class="py-3 px-4">${usuario.email || ''}</td>
         <td class="py-3 px-4">${usuario.role}</td>
+        <td class="py-3 px-4">${usuario.verified ? 'Sí' : 'No'}</td>
         <td class="py-3 px-4 text-center">
             <button class="btn-edit-usuario text-blue-600 hover:text-blue-800 mx-1" title="Editar"><i class="fas fa-edit"></i></button>
             <button class="btn-delete-usuario text-red-600 hover:text-red-800 mx-1" title="Eliminar"><i class="fas fa-trash-alt"></i></button>

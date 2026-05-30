@@ -10,7 +10,7 @@
  * Configura los listeners para el módulo de estilos
  */
 function setupEstilosListeners() {
-    $('#btn-add-estilo').on('click', () => {
+    $(document).on('click', '#btn-add-estilo', () => {
         if (ensureAdminAction('crear un estilo')) openEstiloModal();
     });
     $(document).on('click', '.btn-edit-estilo', function() {
@@ -26,7 +26,7 @@ function setupEstilosListeners() {
             });
         }
     });
-    $('#form-estilo').on('submit', handleEstiloSubmit);
+    $(document).on('submit', '#form-estilo', handleEstiloSubmit);
 }
 
 /**

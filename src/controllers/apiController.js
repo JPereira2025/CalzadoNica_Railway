@@ -1,5 +1,179 @@
 const prisma = require('../services/prismaService');
 const { normalizeRole } = require('../utils/role');
+const jwt = require('jsonwebtoken');
+const nodemailer = require('nodemailer');
+const { JWT_SECRET, EMAIL } = require('../config');
+
+const transporter = nodemailer.createTransport({
+  host: EMAIL.host,
+  port: EMAIL.port,
+  secure: false,
+  auth: {
+    user: EMAIL.user,
+    pass: EMAIL.pass
+  },
+  requireTLS: true,
+  tls: {
+    rejectUnauthorized: false
+  }
+});
+
+const fs = require('fs');
+const path = require('path');
+
+// Upload product image (admin only)
+async function uploadProductoImagen(req, res) {
+  try {
+    const productoId = req.params.id;
+    if (!productoId) return res.status(400).json({ success: false, message: 'ID de producto requerido' });
+
+    const producto = await prisma.productos.findUnique({ where: { id: String(productoId) } });
+    if (!producto) return res.status(404).json({ success: false, message: 'Producto no encontrado' });
+
+    if (!req.file) return res.status(400).json({ success: false, message: 'Archivo de imagen no proporcionado' });
+
+    const url = req.file.url || `/tienda/img/${req.file.filename}`;
+    const es_principal = req.body.es_principal === '1' || req.body.es_principal === 'true' || req.body.es_principal === true;
+    const orden = Number(req.body.orden) || 0;
+
+    // Si se marca como principal, desmarcar otras
+    if (es_principal) {
+      if (prisma.producto_imagenes && typeof prisma.producto_imagenes.updateMany === 'function') {
+        await prisma.producto_imagenes.updateMany({ where: { producto_id: String(productoId), es_principal: true }, data: { es_principal: false } });
+      } else {
+        // fallback SQL
+        await prisma.$executeRawUnsafe('UPDATE producto_imagenes SET es_principal = 0 WHERE producto_id = ? AND es_principal = 1', String(productoId));
+      }
+    }
+
+    let created = null;
+    if (prisma.producto_imagenes && typeof prisma.producto_imagenes.create === 'function') {
+      created = await prisma.producto_imagenes.create({
+        data: {
+          producto_id: String(productoId),
+          url: String(url),
+          es_principal: !!es_principal,
+          orden: orden
+        }
+      });
+    } else {
+      // Fallback: insertar vía SQL directo si el cliente Prisma no expone el modelo
+      try {
+        const insertSql = `INSERT INTO producto_imagenes (producto_id, url, es_principal, orden) VALUES (?, ?, ?, ?)`;
+        await prisma.$executeRawUnsafe(insertSql, String(productoId), String(url), es_principal ? 1 : 0, Number(orden));
+        const [row] = await prisma.$queryRawUnsafe('SELECT * FROM producto_imagenes WHERE id = LAST_INSERT_ID()');
+        created = row || null;
+      } catch (sqlErr) {
+        console.error('SQL fallback error:', sqlErr);
+        // Si la tabla no existe, intentar crearla (migración ligera) y reintentar
+        try {
+          if (sqlErr && sqlErr.meta && sqlErr.meta.code === '1146' || (sqlErr && sqlErr.message && sqlErr.message.includes("doesn't exist"))) {
+            const createSql = `CREATE TABLE IF NOT EXISTS producto_imagenes (
+              id INT AUTO_INCREMENT PRIMARY KEY,
+              producto_id VARCHAR(50),
+              url VARCHAR(500),
+              es_principal TINYINT(1) DEFAULT 0,
+              orden INT DEFAULT 0,
+              INDEX(producto_id)
+            ) ENGINE=InnoDB;`;
+            await prisma.$executeRawUnsafe(createSql);
+            // reintentar inserción
+            const insertSql2 = `INSERT INTO producto_imagenes (producto_id, url, es_principal, orden) VALUES (?, ?, ?, ?)`;
+            await prisma.$executeRawUnsafe(insertSql2, String(productoId), String(url), es_principal ? 1 : 0, Number(orden));
+            const [row2] = await prisma.$queryRawUnsafe('SELECT * FROM producto_imagenes WHERE id = LAST_INSERT_ID()');
+            created = row2 || null;
+          } else {
+            throw sqlErr;
+          }
+        } catch (innerErr) {
+          console.error('SQL fallback create/retry error:', innerErr);
+          throw innerErr;
+        }
+      }
+    }
+
+    res.json({ success: true, message: 'Imagen subida', imagen: created });
+  } catch (error) {
+    console.error('UPLOAD IMG ERROR:', error);
+    res.status(500).json({ success: false, message: 'Error subiendo imagen de producto' });
+  }
+}
+
+// Listar imágenes de un producto (admin)
+async function getProductoImagenes(req, res) {
+  try {
+    const productoId = req.params.id;
+    if (!productoId) return res.status(400).json({ success: false, message: 'ID de producto requerido' });
+    let imgs = [];
+    if (prisma.producto_imagenes && typeof prisma.producto_imagenes.findMany === 'function') {
+      imgs = await prisma.producto_imagenes.findMany({ where: { producto_id: String(productoId) }, orderBy: { orden: 'asc' } });
+    } else {
+      imgs = await prisma.$queryRawUnsafe('SELECT * FROM producto_imagenes WHERE producto_id = ? ORDER BY orden ASC', String(productoId));
+    }
+    res.json(imgs || []);
+  } catch (error) {
+    console.error('GET IMAGES ERROR:', error);
+    res.status(500).json({ success: false, message: 'Error al listar imágenes' });
+  }
+}
+
+// Eliminar imagen de producto (admin)
+async function deleteProductoImagen(req, res) {
+  try {
+    const productoId = req.params.id;
+    const imgId = Number(req.params.imgId);
+    if (!productoId || !imgId) return res.status(400).json({ success: false, message: 'Producto e imagen requeridos' });
+    let img = null;
+    if (prisma.producto_imagenes && typeof prisma.producto_imagenes.findUnique === 'function') {
+      img = await prisma.producto_imagenes.findUnique({ where: { id: imgId } });
+    } else {
+      const rows = await prisma.$queryRawUnsafe('SELECT * FROM producto_imagenes WHERE id = ? LIMIT 1', Number(imgId));
+      img = (rows && rows.length) ? rows[0] : null;
+    }
+    if (!img) return res.status(404).json({ success: false, message: 'Imagen no encontrada' });
+    // borrar fichero si está en public/tienda/img
+    try {
+      if (img.url && img.url.startsWith('/tienda/img/')) {
+        const filename = img.url.replace('/tienda/img/', '');
+        const filePath = path.join(__dirname, '..', '..', 'public', 'tienda', 'img', filename);
+        if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+      }
+    } catch (fsErr) {
+      console.error('FS delete error:', fsErr);
+    }
+    if (prisma.producto_imagenes && typeof prisma.producto_imagenes.delete === 'function') {
+      await prisma.producto_imagenes.delete({ where: { id: imgId } });
+    } else {
+      await prisma.$executeRawUnsafe('DELETE FROM producto_imagenes WHERE id = ?', Number(imgId));
+    }
+    res.json({ success: true, message: 'Imagen eliminada' });
+  } catch (error) {
+    console.error('DELETE IMG ERROR:', error);
+    res.status(500).json({ success: false, message: 'Error al eliminar imagen' });
+  }
+}
+
+// Marcar imagen como principal (admin)
+async function setPrincipalImagen(req, res) {
+  try {
+    const productoId = req.params.id;
+    const imgId = Number(req.params.imgId);
+    if (!productoId || !imgId) return res.status(400).json({ success: false, message: 'Producto e imagen requeridos' });
+    // desmarcar otras
+    if (prisma.producto_imagenes && typeof prisma.producto_imagenes.updateMany === 'function') {
+      await prisma.producto_imagenes.updateMany({ where: { producto_id: String(productoId), es_principal: true }, data: { es_principal: false } });
+      // marcar seleccionada
+      await prisma.producto_imagenes.update({ where: { id: imgId }, data: { es_principal: true } });
+    } else {
+      await prisma.$executeRawUnsafe('UPDATE producto_imagenes SET es_principal = 0 WHERE producto_id = ?', String(productoId));
+      await prisma.$executeRawUnsafe('UPDATE producto_imagenes SET es_principal = 1 WHERE id = ?', Number(imgId));
+    }
+    res.json({ success: true, message: 'Imagen marcada como principal' });
+  } catch (error) {
+    console.error('SET PRINCIPAL ERROR:', error);
+    res.status(500).json({ success: false, message: 'Error marcando imagen principal' });
+  }
+}
 
 async function getUsuarios(req, res) {
   try {
@@ -7,13 +181,13 @@ async function getUsuarios(req, res) {
     if (id) {
       const user = await prisma.usuarios.findUnique({
         where: { id: Number(id) },
-        select: { id: true, username: true, role: true }
+        select: { id: true, username: true, email: true, role: true, verified: true }
       });
       return res.json(user || {});
     }
 
     const users = await prisma.usuarios.findMany({
-      select: { id: true, username: true, role: true }
+      select: { id: true, username: true, email: true, role: true, verified: true }
     });
     res.json(users);
   } catch (error) {
@@ -23,9 +197,9 @@ async function getUsuarios(req, res) {
 }
 
 async function createUsuario(req, res) {
-  const { username, password, role } = req.body;
+  const { username, email, password, role, verified } = req.body;
 
-  if (!username || !password || !role) {
+  if (!username || !email || !password || !role) {
     return res.status(400).json({ success: false, message: 'Faltan campos requeridos' });
   }
 
@@ -35,23 +209,61 @@ async function createUsuario(req, res) {
     const created = await prisma.usuarios.create({
       data: {
         username,
+        email,
         password: hashedPassword,
-        role: normalizedRole
+        role: normalizedRole,
+        verified: !!verified
       }
     });
 
-    res.json({ success: true, message: 'Usuario creado', id: created.id });
+    let verificationToken = null;
+    if (!verified) {
+      verificationToken = jwt.sign(
+        {
+          id: created.id,
+          username: created.username,
+          email: created.email,
+          type: 'email_verification'
+        },
+        JWT_SECRET,
+        { expiresIn: '15m' }
+      );
+
+      const expiry = new Date(Date.now() + 15 * 60 * 1000);
+      await prisma.usuarios.update({
+        where: { id: created.id },
+        data: {
+          verification_token: verificationToken,
+          verification_token_expiry: expiry
+        }
+      });
+
+      try {
+        await transporter.sendMail({
+          from: EMAIL.from,
+          to: created.email,
+          subject: 'Tu token de verificación de Calzado Nica',
+          text: `Tu token de verificación es: ${verificationToken}`,
+          html: `<p>Tu token de verificación es:</p><pre style="font-family: monospace; background:#f4f4f4; padding:10px; border-radius:6px; overflow-x:auto;">${verificationToken}</pre>`
+        });
+      } catch (mailError) {
+        console.error('MAIL ERROR (createUsuario):', mailError);
+        return res.status(500).json({ success: false, message: 'Usuario creado, pero no se pudo enviar el correo de verificación.' });
+      }
+    }
+
+    res.json({ success: true, message: 'Usuario creado', id: created.id, verificationToken });
   } catch (error) {
     console.error(error);
     if (error.code === 'P2002') {
-      return res.status(409).json({ success: false, message: 'El usuario ya existe' });
+      return res.status(409).json({ success: false, message: 'El usuario o el email ya existe' });
     }
     res.status(500).json({ success: false, message: 'Error al crear usuario' });
   }
 }
 
 async function updateUsuario(req, res) {
-  const { id, username, password, role } = req.body;
+  const { id, username, email, password, role, verified } = req.body;
 
   if (!id) {
     return res.status(400).json({ success: false, message: 'ID requerido' });
@@ -59,7 +271,9 @@ async function updateUsuario(req, res) {
 
   const data = {};
   if (username) data.username = username;
+  if (email) data.email = email;
   if (role) data.role = normalizeRole(role);
+  if (typeof verified !== 'undefined') data.verified = !!verified;
   if (password) data.password = await require('bcryptjs').hash(password, 10);
 
   if (Object.keys(data).length === 0) {
@@ -67,6 +281,29 @@ async function updateUsuario(req, res) {
   }
 
   try {
+    if (typeof verified !== 'undefined') {
+      if (data.verified) {
+        data.verification_token = null;
+        data.verification_token_expiry = null;
+      } else {
+        const existingUser = await prisma.usuarios.findUnique({ where: { id: Number(id) } });
+        if (existingUser && !existingUser.verification_token && existingUser.email) {
+          const newToken = jwt.sign(
+            {
+              id: Number(id),
+              username: username || existingUser.username,
+              email: existingUser.email,
+              type: 'email_verification'
+            },
+            JWT_SECRET,
+            { expiresIn: '15m' }
+          );
+          data.verification_token = newToken;
+          data.verification_token_expiry = new Date(Date.now() + 15 * 60 * 1000);
+        }
+      }
+    }
+
     await prisma.usuarios.update({
       where: { id: Number(id) },
       data
@@ -382,13 +619,34 @@ async function getProductos(req, res) {
       prisma.categorias.findMany(),
       prisma.estilos.findMany()
     ]);
+
+    // Cargar imágenes por separado (algunas instalaciones de Prisma usan nombres diferentes)
+    const productIds = productos.map(p => p.id);
+    let imagenes = [];
+    if (productIds.length && prisma.producto_imagenes && typeof prisma.producto_imagenes.findMany === 'function') {
+      imagenes = await prisma.producto_imagenes.findMany({ where: { producto_id: { in: productIds } } });
+    } else if (productIds.length) {
+      // Fallback: consultar directamente la tabla producto_imagenes si el modelo no está expuesto
+      const safeList = productIds.map(id => id.replace(/'/g, "''")).map(id => `'${id}'`).join(',');
+      imagenes = await prisma.$queryRawUnsafe(`SELECT * FROM producto_imagenes WHERE producto_id IN (${safeList})`);
+    } else {
+      imagenes = [];
+    }
+    const imagenMap = new Map();
+    for (const img of imagenes) {
+      if (!imagenMap.has(img.producto_id)) imagenMap.set(img.producto_id, []);
+      imagenMap.get(img.producto_id).push(img);
+    }
     const categoriaMap = new Map(categorias.map(cat => [cat.id, cat.nombre]));
     const estiloMap = new Map(estilos.map(est => [est.id, est.nombre]));
 
     const mapProducto = prod => ({
       ...prod,
       categoria_nombre: prod.categoria_id ? categoriaMap.get(prod.categoria_id) || '' : '',
-      estilo_nombre: prod.estilo_id ? estiloMap.get(prod.estilo_id) || '' : ''
+      estilo_nombre: prod.estilo_id ? estiloMap.get(prod.estilo_id) || '' : '',
+      imagen_principal: (imagenMap.get(prod.id) && imagenMap.get(prod.id).length)
+        ? (imagenMap.get(prod.id).find(im => im.es_principal) || imagenMap.get(prod.id)[0]).url
+        : null
     });
 
     if (id) {
@@ -476,11 +734,25 @@ async function deleteProducto(req, res) {
 
 async function getCodigos(req, res) {
   try {
-    const { id } = req.query;
+    const { id, codigo } = req.query;
     if (id) {
-      const codigo = await prisma.codigos_promocionales.findUnique({ where: { id: String(id) } });
-      return res.json(codigo || {});
+      const codigoDb = await prisma.codigos_promocionales.findUnique({ where: { id: String(id) } });
+      return res.json(codigoDb || {});
     }
+
+    if (codigo) {
+      const now = new Date();
+      const found = await prisma.codigos_promocionales.findFirst({
+        where: {
+          codigo: String(codigo),
+          estado: true,
+          fecha_inicio: { lte: now },
+          fecha_fin: { gte: now }
+        }
+      });
+      return res.json(found || {});
+    }
+
     const codigos = await prisma.codigos_promocionales.findMany();
     res.json(codigos);
   } catch (error) {
@@ -491,14 +763,16 @@ async function getCodigos(req, res) {
 
 async function createCodigo(req, res) {
   const { id, codigo, porcentaje_descuento, fecha_inicio, fecha_fin, estado, descripcion } = req.body;
-  if (!id || !codigo || porcentaje_descuento === undefined || !fecha_inicio || !fecha_fin) {
+  if (!codigo || porcentaje_descuento === undefined || !fecha_inicio || !fecha_fin) {
     return res.status(400).json({ success: false, message: 'Faltan campos requeridos para crear código' });
   }
+
+  const newId = id ? String(id) : String(codigo).substring(0, 20);
 
   try {
     const promocion = await prisma.codigos_promocionales.create({
       data: {
-        id: String(id),
+        id: newId,
         codigo: String(codigo),
         porcentaje_descuento: Number(porcentaje_descuento),
         fecha_inicio: new Date(fecha_inicio),
@@ -722,6 +996,10 @@ module.exports = {
   createProducto,
   updateProducto,
   deleteProducto,
+  uploadProductoImagen,
+  getProductoImagenes,
+  deleteProductoImagen,
+  setPrincipalImagen,
   getCodigos,
   createCodigo,
   updateCodigo,

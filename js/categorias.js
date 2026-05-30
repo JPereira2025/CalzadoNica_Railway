@@ -10,7 +10,7 @@
  * Configura los listeners para el módulo de categorías
  */
 function setupCategoriasListeners() {
-    $('#btn-add-categoria').on('click', () => {
+    $(document).on('click', '#btn-add-categoria', () => {
         if (ensureAdminAction('crear una categoría')) openCategoriaModal();
     });
     $(document).on('click', '.btn-edit-categoria', function() {
@@ -26,7 +26,7 @@ function setupCategoriasListeners() {
             });
         }
     });
-    $('#form-categoria').on('submit', handleCategoriaSubmit);
+    $(document).on('submit', '#form-categoria', handleCategoriaSubmit);
 }
 
 /**

@@ -33,10 +33,15 @@ function loadDashboardStats() {
  * Configura el carrusel de imágenes del dashboard
  */
 function setupCarousel() {
-    let currentSlide = 0;
-    const slides = $('.carousel-slide');
-    const indicators = $('.carousel-indicator');
+    const $page = $('#dashboard-page');
+    if ($page.data('carousel-initialized')) return;
+
+    const slides = $page.find('.carousel-slide');
+    const indicators = $page.find('.carousel-indicator');
     const totalSlides = slides.length;
+    if (totalSlides === 0) return;
+
+    let currentSlide = 0;
 
     function showSlide(index) {
         slides.css('opacity', '0');
@@ -60,12 +65,11 @@ function setupCarousel() {
     // Cambio automático cada 5 segundos
     setInterval(nextSlide, 5000);
 
-    // Botones
-    $('#nextBtn').on('click', nextSlide);
-    $('#prevBtn').on('click', prevSlide);
-
-    // Indicadores
-    indicators.on('click', function() {
+    // Botones e indicadores delegados dentro de la página
+    $page.off('click', '#nextBtn').on('click', '#nextBtn', nextSlide);
+    $page.off('click', '#prevBtn').on('click', '#prevBtn', prevSlide);
+    $page.off('click', '.carousel-indicator').on('click', '.carousel-indicator', function() {
         showSlide($(this).data('slide'));
     });
+    $page.data('carousel-initialized', true);
 }
