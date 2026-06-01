@@ -139,7 +139,8 @@ body {
   border: none;
   padding: 0.4rem 1rem;
   border-radius: 4px;
-  color: white;
+  color: var(--primary);
+  border: 1px solid rgba(13,110,253,0.12);
   cursor: pointer;
 }
 
@@ -895,7 +896,7 @@ body {
 }
 
 .toast.error {
-  background: var(--secondary);
+  background: #e74c3c; /* rojo para errores */
 }
 
 @keyframes slideIn {

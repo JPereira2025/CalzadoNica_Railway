@@ -42,12 +42,18 @@ function setupCarousel() {
     if (totalSlides === 0) return;
 
     let currentSlide = 0;
+    let autoPlayInterval = null;
 
     function showSlide(index) {
-        slides.css('opacity', '0');
-        indicators.css('opacity', '0.5');
-        $(slides[index]).css('opacity', '1');
-        $(indicators[index]).css('opacity', '1');
+        // Ocultar todas las slides
+        slides.addClass('opacity-0').removeClass('opacity-100');
+        // Resetear indicadores
+        indicators.removeClass('opacity-100').addClass('opacity-50');
+
+        // Mostrar la slide activa
+        slides.eq(index).removeClass('opacity-0').addClass('opacity-100');
+        indicators.eq(index).removeClass('opacity-50').addClass('opacity-100');
+
         currentSlide = index;
     }
 
@@ -59,17 +65,38 @@ function setupCarousel() {
         showSlide((currentSlide - 1 + totalSlides) % totalSlides);
     }
 
+    function startAutoPlay() {
+        stopAutoPlay();
+        autoPlayInterval = setInterval(nextSlide, 5000);
+    }
+
+    function stopAutoPlay() {
+        if (autoPlayInterval) {
+            clearInterval(autoPlayInterval);
+            autoPlayInterval = null;
+        }
+    }
+
     // Inicializar
     showSlide(0);
-
-    // Cambio automático cada 5 segundos
-    setInterval(nextSlide, 5000);
+    startAutoPlay();
 
     // Botones e indicadores delegados dentro de la página
-    $page.off('click', '#nextBtn').on('click', '#nextBtn', nextSlide);
-    $page.off('click', '#prevBtn').on('click', '#prevBtn', prevSlide);
+    $page.off('click', '#nextBtn').on('click', '#nextBtn', function() {
+        nextSlide();
+        startAutoPlay(); // Reiniciar el auto-play al interactuar
+    });
+    $page.off('click', '#prevBtn').on('click', '#prevBtn', function() {
+        prevSlide();
+        startAutoPlay();
+    });
     $page.off('click', '.carousel-indicator').on('click', '.carousel-indicator', function() {
         showSlide($(this).data('slide'));
+        startAutoPlay();
     });
+
+    // Pausar auto-play cuando el mouse está sobre el carrusel
+    $page.find('.carousel-container').on('mouseenter', stopAutoPlay).on('mouseleave', startAutoPlay);
+
     $page.data('carousel-initialized', true);
 }

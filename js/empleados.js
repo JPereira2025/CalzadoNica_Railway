@@ -20,7 +20,7 @@ function setupEmpleadosListeners() {
         if (!ensureAdminAction('eliminar un empleado')) return;
         const id = $(this).closest('tr').data('id');
         if (confirm('¿Está seguro de que desea eliminar este empleado?')) {
-            apiCall(`empleados.php?id=${id}`, 'DELETE').done(resp => {
+            apiCall(`/api/empleados?id=${id}`, 'DELETE').done(resp => {
                 showNotification(resp.message || 'Empleado eliminado', 'success');
                 loadEmpleados();
             });
@@ -117,7 +117,7 @@ function normalizeEmpleadoData(empleado) {
 }
 
 function loadEmpleados() {
-    apiCall('empleados.php').done(data => {
+    apiCall('/api/empleados').done(data => {
         const normalized = normalizeList(data).map(normalizeEmpleadoData);
         localStorage.setItem('empleados', JSON.stringify(normalized));
         renderTable('empleados-table-body', normalized, renderEmpleadoRow);
@@ -142,7 +142,7 @@ function openEmpleadoModal(id = null) {
     $('#modal-empleado-title').text(id ? 'Editar Empleado' : 'Nuevo Empleado');
     $('#empleado-id-form').val(id || '');
     if (id) {
-        apiCall(`empleados.php?id=${id}`).done(data => {
+        apiCall(`/api/empleados?id=${id}`).done(data => {
             const emp = normalizeList(data)[0];
             if (emp) {
                 $('#empleado-nombres').val(emp.nombres);
@@ -199,7 +199,7 @@ function handleEmpleadoSubmit(e) {
     payload.id = id || generateEmpleadoId(payload);
 
     const method = id ? 'PUT' : 'POST';
-    apiCall('empleados.php', method, payload).done(resp => {
+    apiCall('/api/empleados', method, payload).done(resp => {
         showNotification(resp.message, 'success');
         $('#modal-empleado').fadeOut(200);
         loadEmpleados();

@@ -1,27 +1,55 @@
+/**
+ * ARCHIVO: app.js
+ * DESCRIPCIÓN: Configuración centralizada de Express.
+ * FUNCIONALIDAD: Middlewares globales, archivos estáticos y ruteo principal.
+ */
+
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const routes = require('./routes');
+const blockTienda = require('./middlewares/blockTienda');
 
 const app = express();
 
+// Middlewares globales de utilidad
 app.use(cors());
-app.use(express.json());
+app.use(express.json()); // Habilita la lectura de JSON en el body
+app.use(express.urlencoded({ extended: true })); // Habilita la lectura de formularios
 
-// Servir archivos estáticos desde la carpeta public (para /tienda/, css, js, img)
-app.use(express.static(path.join(__dirname, '..', 'public')));
+// Servir un favicon mínimo (SVG) para evitar 404 en requests del navegador
+app.get('/favicon.ico', (req, res) => {
+    res.type('image/svg+xml');
+    res.send(`<?xml version="1.0" encoding="UTF-8"?>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+        <rect width="100%" height="100%" fill="#1E40AF" rx="8"/>
+        <text x="50%" y="55%" font-size="36" font-family="Arial, Helvetica, sans-serif" fill="white" text-anchor="middle" alignment-baseline="middle">CN</text>
+    </svg>`);
+});
+
+/** 
+ * Configuración de Archivos Estáticos
+ */
+app.use('/tienda', express.static(path.join(__dirname, '..', 'public', 'tienda')));
+
+// Servidor de archivos raíz (index.html, assets, etc)
+app.use(express.static(path.join(__dirname, '..')));
 
 app.use('/', routes);
 
-// Manejo de errores: intercepta JSON inválido y otros errores
-app.use((err, req, res, next) => {
-  // body-parser / express.json lanza SyntaxError para JSON mal formado
-  if (err && err instanceof SyntaxError && err.status === 400 && 'body' in err) {
-    console.warn('JSON inválido recibido:', err.message);
-    return res.status(400).json({ success: false, error: 'JSON inválido' });
-  }
-  console.error(err);
-  res.status(500).json({ success: false, message: 'Error interno del servidor' });
-});
+/**
+ * Middleware de Manejo de Errores Global (Estilo Profesor)
+ */
+const errorHandler = (err, req, res, next) => {
+    console.error(`[ERROR] ${err.message}`);
+    const status = err.status || 500;
+    const message = err.message || 'Error interno del servidor';
+    res.status(status).json({ 
+        success: false, 
+        message: message 
+    });
+};
+
+app.use(errorHandler);
 
 module.exports = app;

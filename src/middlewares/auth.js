@@ -7,12 +7,12 @@ function authenticateToken(req, res, next) {
   const token = authHeader.split(' ')[1];
 
   if (!token) {
-    return res.status(401).json({ success: false, message: 'Token no proporcionado' });
+    return next({ status: 401, message: 'Token no proporcionado' });
   }
 
   jwt.verify(token, JWT_SECRET, (err, payload) => {
     if (err) {
-      return res.status(403).json({ success: false, message: 'Token inválido' });
+      return next({ status: 403, message: 'Token inválido' });
     }
 
     req.user = payload;
@@ -22,7 +22,7 @@ function authenticateToken(req, res, next) {
 
 function requireAdmin(req, res, next) {
   if (!req.user || normalizeRole(req.user.role) !== 'Administrador') {
-    return res.status(403).json({ success: false, message: 'Acceso denegado: solo administrador.' });
+    return next({ status: 403, message: 'Acceso denegado: solo administrador.' });
   }
   next();
 }

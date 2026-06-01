@@ -1,6 +1,7 @@
 // --- CONFIGURACIÓN DE LA API ---
 
-const API_BASE = 'http://localhost:3001/';
+// Si estamos en el mismo servidor, usamos rutas relativas para evitar errores de origen
+const API_BASE = window.location.origin + '/';
 
 function mapEndpoint(endpoint) {
     if (!endpoint) return API_BASE;

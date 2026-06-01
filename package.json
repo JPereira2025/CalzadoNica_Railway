@@ -6,6 +6,7 @@
     "build:css": "node build-tailwind.js",
     "watch:css": "nodemon --watch src/css --exec \"node build-tailwind.js\"",
     "start:api": "node src/server.js",
+    "predev:api": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/free_port_windows.ps1 3001",
     "dev:api": "nodemon --watch src --exec \"node src/server.js\""
   },
   "dependencies": {

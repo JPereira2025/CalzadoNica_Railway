@@ -3,7 +3,8 @@ function normalizeRole(role) {
     admin: 'Administrador',
     administrador: 'Administrador',
     vendedor: 'Vendedor',
-    gerente: 'Gerente'
+    gerente: 'Gerente',
+    cliente: 'Cliente'
   };
 
   if (!role) return 'Vendedor';

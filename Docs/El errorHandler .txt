@@ -1,0 +1,8 @@
+El errorHandler se utiliza con app.use(errorHandler) porque se aplica como un middleware global 
+para manejar errores en toda la aplicación, independientemente de la ruta. Esto significa que
+captura errores en cualquier parte de la app.
+
+En cambio, authenticateToken se usa como middleware específico para rutas, 
+como en app.get('/protected-route', authenticateToken), para validar el token 
+solo en esa ruta concreta. Esto permite que solo las solicitudes a esa ruta pasen
+ por la verificación de autenticación, mientras que el errorHandler se encarga de manejar errores en general.

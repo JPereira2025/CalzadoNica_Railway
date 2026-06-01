@@ -1,4 +1,12 @@
-// Tienda JS - Funcionalidad básica: listar productos, carrito en localStorage, checkout
+/**
+ * MÓDULO: Tienda Virtual
+ * @author Gemini Code Assist
+ * @description Lógica del lado del cliente para la tienda de Calzado Nica.
+ * Maneja:
+ * - Listado dinámico de productos y filtros.
+ * - Gestión del carrito de compras (LocalStorage).
+ * - Procesamiento de pedidos y autenticación de clientes.
+ */
 (function () {
   const CART_KEY = 'cn_cart';
   let currentProduct = null;
@@ -13,12 +21,19 @@
   function getCart() {
     try { return JSON.parse(localStorage.getItem(CART_KEY)) || []; } catch { return []; }
   }
+
+  /**
+   * Persistencia del carrito
+   */
   function saveCart(cart) { localStorage.setItem(CART_KEY, JSON.stringify(cart)); }
 
   function formatCurrency(n) {
     return `C$ ${Number(n).toFixed(2)}`;
   }
 
+  /**
+   * Obtiene los productos de la API y sincroniza categorías/estilos
+   */
   async function cargarProductos() {
     try {
       const [resP, resC, resE] = await Promise.all([
@@ -39,6 +54,9 @@
     }
   }
 
+  /**
+   * Llena los dropdowns de filtros con datos reales de la DB
+   */
   function populateFilters() {
     const catSel = document.getElementById('filtro-categoria');
     const estSel = document.getElementById('filtro-estilo');
@@ -453,8 +471,13 @@
           // actualizar montos en carrito y checkout
           actualizarUIcarrito();
           if (document.getElementById('resumen-subtotal')) window.tienda.inicializarCheckout();
+        } else if (data && data.status) {
+          if (data.status === 'expired') showToast('Código vencido', 'error');
+          else if (data.status === 'inactive') showToast('Código inactivo', 'error');
+          else if (data.status === 'not_started') showToast('Código aún no válido', 'error');
+          else showToast(data.message || 'Código inválido', 'error');
         } else {
-          showToast('Código inválido o expirado', 'error');
+          showToast('Código inválido', 'error');
         }
       }).catch(() => showToast('Error verificando código', 'error'));
   }
@@ -543,6 +566,10 @@
     document.querySelectorAll('.modal-tab').forEach(el => el.classList.toggle('active', el.dataset.tab === tab));
     document.querySelectorAll('.modal-form').forEach(f => f.classList.toggle('active', f.id.startsWith(tab)));
   }
+
+  /**
+   * Gestión de inicio de sesión del cliente
+   */
   async function handleLogin(e) {
     e.preventDefault();
     const form = e.target;
@@ -562,12 +589,16 @@
     } catch (err) { console.error(err); document.getElementById('login-error').textContent = 'Error de red'; }
   }
 
+  /**
+   * Registro de nuevos clientes
+   */
   async function handleRegister(e) {
     e.preventDefault();
     const form = e.target;
     const email = form.querySelector('input[name="email"]').value;
     const nombres = form.querySelector('input[name="nombres"]').value || '';
     const apellidos = form.querySelector('input[name="apellidos"]').value || '';
+    const telefono = form.querySelector('input[name="telefono"]') ? form.querySelector('input[name="telefono"]').value || '' : '';
     const password = form.querySelector('input[name="password"]').value;
     const confirm = form.querySelector('input[name="confirmPassword"]').value;
     if (password !== confirm) {
@@ -575,20 +606,104 @@
       return;
     }
     try {
-      const res = await fetch('/register', { method: 'POST', headers: { 'Content-Type':'application/json' }, body: JSON.stringify({ username: email, email, password }) });
+      const res = await fetch('/register', { method: 'POST', headers: { 'Content-Type':'application/json' }, body: JSON.stringify({ username: email, email, password, nombres, apellidos, telefono }) });
       const data = await res.json();
       if (!res.ok) {
         const el = document.getElementById('register-error'); if (el) { el.textContent = data.message || 'Error registrando'; el.style.display = 'block'; }
+        // Si el correo/usuario ya existe, abrir modal de verificación y reenviar token automáticamente
+        if (res.status === 409) {
+          try {
+            const verifyModal = document.getElementById('verify-modal-store');
+            const inputUser = document.getElementById('verify-usernameOrEmail-store');
+            if (inputUser) inputUser.value = email;
+            if (verifyModal) verifyModal.classList.add('active');
+            // reintentar envío del token
+            setTimeout(()=>{ window.resendTokenStore && window.resendTokenStore(); }, 200);
+          } catch (e) { /* no bloquear por errores en UI */ }
+        }
         return;
       }
       const suc = document.getElementById('register-success'); if (suc) { suc.textContent = data.message || 'Cuenta creada. Revisa tu correo'; suc.style.display = 'block'; }
+      // Mostrar modal de verificación en tienda y pre-llenar el email
+      try {
+        const verifyModal = document.getElementById('verify-modal-store');
+        const inputUser = document.getElementById('verify-usernameOrEmail-store');
+        const inputToken = document.getElementById('verify-token-store');
+        if (inputUser) inputUser.value = email;
+        if (verifyModal) verifyModal.classList.add('active');
+        if (inputToken) { inputToken.value = ''; setTimeout(()=>inputToken.focus(), 200); }
+      } catch (err) { /* no bloquear por errores en UI */ }
     } catch (err) { console.error(err); document.getElementById('register-error').textContent = 'Error de red'; }
+  }
+
+  async function handleVerifyStore(e) {
+    if (e && e.preventDefault) e.preventDefault();
+    const usernameOrEmail = document.getElementById('verify-usernameOrEmail-store')?.value?.trim();
+    const token = document.getElementById('verify-token-store')?.value?.trim();
+    const errEl = document.getElementById('verify-error-store');
+    const sucEl = document.getElementById('verify-success-store');
+    if (errEl) { errEl.textContent = ''; errEl.style.display = 'none'; }
+    if (sucEl) { sucEl.textContent = ''; sucEl.style.display = 'none'; }
+    if (!usernameOrEmail || !token) {
+      if (errEl) { errEl.textContent = 'Completa correo/usuario y token'; errEl.style.display = 'block'; }
+      return false;
+    }
+    try {
+      const res = await fetch('/verify-token', { method: 'POST', headers: { 'Content-Type':'application/json' }, body: JSON.stringify({ usernameOrEmail, token }) });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        if (errEl) { errEl.textContent = data.message || 'Token inválido'; errEl.style.display = 'block'; }
+        return false;
+      }
+      if (sucEl) { sucEl.textContent = data.message || 'Cuenta verificada'; sucEl.style.display = 'block'; }
+      // cerrar modal tras breve delay
+      setTimeout(()=>{ document.getElementById('verify-modal-store')?.classList.remove('active'); }, 1200);
+      return true;
+    } catch (err) {
+      console.error('verify error', err);
+      if (errEl) { errEl.textContent = 'Error de red'; errEl.style.display = 'block'; }
+      return false;
+    }
+  }
+
+  async function resendTokenStore() {
+    const usernameOrEmail = document.getElementById('verify-usernameOrEmail-store')?.value?.trim();
+    const errEl = document.getElementById('verify-error-store');
+    const sucEl = document.getElementById('verify-success-store');
+    if (errEl) { errEl.textContent = ''; errEl.style.display = 'none'; }
+    if (sucEl) { sucEl.textContent = ''; sucEl.style.display = 'none'; }
+    if (!usernameOrEmail) {
+      if (errEl) { errEl.textContent = 'Ingresa tu correo o usuario'; errEl.style.display = 'block'; }
+      return false;
+    }
+    try {
+      const res = await fetch('/resend-token', { method: 'POST', headers: { 'Content-Type':'application/json' }, body: JSON.stringify({ usernameOrEmail }) });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        if (errEl) { errEl.textContent = data.message || 'No se pudo reenviar el token'; errEl.style.display = 'block'; }
+        return false;
+      }
+      if (sucEl) { sucEl.textContent = data.message || 'Token reenviado'; sucEl.style.display = 'block'; }
+      return true;
+    } catch (err) {
+      console.error('resend error', err);
+      if (errEl) { errEl.textContent = 'Error de red'; errEl.style.display = 'block'; }
+      return false;
+    }
   }
 
   function logout() {
     localStorage.removeItem('cn_token');
     localStorage.removeItem('cn_user');
+    try {
+      // limpiar carrito y estado relacionado al cerrar sesión
+      localStorage.removeItem(CART_KEY);
+      currentDiscount = null;
+      saveCart([]);
+    } catch (e) { /* no bloquear logout por errores de storage */ }
     updateAuthUI();
+    // redirigir al inicio de la tienda
+    window.location.href = '/tienda/index.html';
   }
 
   function updateAuthUI() {
@@ -601,67 +716,6 @@
       document.getElementById('auth-buttons') && (document.getElementById('auth-buttons').style.display = 'flex');
       document.getElementById('user-menu') && (document.getElementById('user-menu').style.display = 'none');
       document.getElementById('user-name') && (document.getElementById('user-name').textContent = '');
-    }
-  }
-
-  // Admin UI: init and upload
-  async function initAdmin() {
-    const user = JSON.parse(localStorage.getItem('cn_user') || 'null');
-    const msg = document.getElementById('admin-msg');
-    if (!user || user.role !== 'Administrador') {
-      if (msg) msg.textContent = 'Acceso denegado: se requiere usuario Administrador. Inicia sesión con cuenta admin.';
-      document.getElementById('upload-form')?.addEventListener('submit', e => e.preventDefault());
-      return;
-    }
-
-    // poblar select de productos
-    const sel = document.getElementById('admin-producto');
-    sel.innerHTML = '';
-    try {
-      const res = await fetch('/api/productos');
-      const productos = await res.json();
-      productos.forEach(p => {
-        const opt = document.createElement('option');
-        opt.value = p.id;
-        opt.textContent = `${p.marca} ${p.modelo} (${p.id})`;
-        sel.appendChild(opt);
-      });
-    } catch (err) {
-      if (msg) msg.textContent = 'Error cargando productos';
-    }
-
-    document.getElementById('upload-form')?.addEventListener('submit', uploadImageAdmin);
-  }
-
-  async function uploadImageAdmin(e) {
-    e.preventDefault();
-    const prodId = document.getElementById('admin-producto')?.value;
-    const fileEl = document.getElementById('admin-imagen');
-    const esPrincipal = document.getElementById('admin-principal')?.checked;
-    const orden = document.getElementById('admin-orden')?.value || 0;
-    const resultEl = document.getElementById('upload-result');
-    resultEl.textContent = '';
-    if (!prodId || !fileEl || !fileEl.files || !fileEl.files.length) return resultEl.textContent = 'Seleccione producto e imagen.';
-    const token = localStorage.getItem('cn_token');
-    if (!token) return resultEl.textContent = 'Debe iniciar sesión como admin.';
-
-    const fd = new FormData();
-    fd.append('imagen', fileEl.files[0]);
-    fd.append('es_principal', esPrincipal ? '1' : '0');
-    fd.append('orden', String(orden));
-
-    try {
-      const res = await fetch(`/api/productos/${encodeURIComponent(prodId)}/imagenes`, {
-        method: 'POST',
-        headers: { 'Authorization': `Bearer ${token}` },
-        body: fd
-      });
-      const data = await res.json();
-      if (!res.ok) return resultEl.textContent = data.message || 'Error subiendo imagen';
-      resultEl.textContent = 'Imagen subida correctamente.';
-    } catch (err) {
-      console.error(err);
-      resultEl.textContent = 'Error subiendo imagen';
     }
   }
 
@@ -722,8 +776,7 @@
     cambiarTab,
     handleLogin,
     handleRegister,
-    logout,
-    initAdmin
+    logout
   };
 
   // Exponer atajos globales para compatibilidad con handlers inline en HTML
@@ -763,6 +816,8 @@
   // Exponer handlers de auth usados en los formularios inline
   window.handleLogin = handleLogin;
   window.handleRegister = handleRegister;
+  window.handleVerifyStore = handleVerifyStore;
+  window.resendTokenStore = resendTokenStore;
   // Exponer aplicarDescuento para botones inline (ej. carrito)
   window.aplicarDescuento = function() { return window.tienda.aplicarDescuento(); };
   // Exponer inicializarCheckout y procesarPedido para checkout.html

@@ -742,15 +742,15 @@ async function getCodigos(req, res) {
 
     if (codigo) {
       const now = new Date();
-      const found = await prisma.codigos_promocionales.findFirst({
-        where: {
-          codigo: String(codigo),
-          estado: true,
-          fecha_inicio: { lte: now },
-          fecha_fin: { gte: now }
-        }
-      });
-      return res.json(found || {});
+      // primero buscar por código sin filtrar por fechas/estado para dar feedback preciso
+      const raw = await prisma.codigos_promocionales.findFirst({ where: { codigo: String(codigo) } });
+      if (!raw) return res.json({});
+      // si existe, comprobar estado/fechas
+      if (!raw.estado) return res.json({ status: 'inactive', message: 'Código inactivo' });
+      if (now < raw.fecha_inicio) return res.json({ status: 'not_started', message: 'Código aún no válido' });
+      if (now > raw.fecha_fin) return res.json({ status: 'expired', message: 'Código vencido' });
+      // válido
+      return res.json(raw);
     }
 
     const codigos = await prisma.codigos_promocionales.findMany();

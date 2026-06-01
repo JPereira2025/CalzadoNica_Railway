@@ -1,4 +1,8 @@
 // --- LÓGICA DE AUTENTICACIÓN ---
+/**
+ * Gestión de Sesión y Seguridad Frontend
+ * @description Controla el acceso a la WebApp administrativa.
+ */
 // Etapas de autenticación:
 // 1. checkSession(): verifica si el usuario ya está en sesión y carga la app.
 // 2. handleLogin(): envía credenciales al backend y almacena el usuario.
@@ -9,19 +13,24 @@
 let currentUser = null;
 let authToken = null;
 
+/**
+ * Estandariza los nombres de roles para consistencia entre DB y UI
+ */
 function normalizeRoleClient(role) {
     const map = {
         'admin': 'Administrador',
         'administrador': 'Administrador',
         'vendedor': 'Vendedor',
-        'gerente': 'Gerente'
+        'gerente': 'Gerente',
+        'cliente': 'Cliente'
     };
     const normalized = String(role || '').trim().toLowerCase();
     return map[normalized] || String(role || '');
 }
 
 /**
- * Verifica si hay sesión activa
+ * Verifica si existe un token y datos de usuario guardados en sessionStorage.
+ * Si los hay, inicializa la aplicación; de lo contrario, muestra el Login.
  */
 function checkSession() {
     const savedUser = sessionStorage.getItem('currentUser');
@@ -43,7 +52,8 @@ function checkSession() {
 }
 
 /**
- * Muestra la aplicación
+ * Oculta el login y muestra el panel principal.
+ * Actualiza los elementos del Header con los datos del usuario.
  */
 function showApp() {
     applyRolePermissions();
@@ -59,12 +69,18 @@ function showApp() {
     }
 }
 
+/**
+ * Helper booleano para verificar si el usuario logueado es Administrador
+ */
 function isAdminUser() {
     if (!currentUser) return false;
     const roleNorm = normalizeRoleClient(currentUser.role);
     return roleNorm === 'Administrador';
 }
 
+/**
+ * Intercepta acciones que requieren privilegios de administrador.
+ */
 function ensureAdminAction(action = 'realizar esta acción') {
     const allowedNonAdminActions = [
         'agregar un producto a la factura',
@@ -77,6 +93,10 @@ function ensureAdminAction(action = 'realizar esta acción') {
     return false;
 }
 
+/**
+ * Manipula el DOM para ocultar o mostrar botones y paneles según el rol.
+ * Implementa la seguridad visual en el frontend.
+ */
 function applyRolePermissions() {
     if (!currentUser) return;
 
@@ -109,7 +129,8 @@ function showLogin() {
 }
 
 /**
- * Maneja el login
+ * Captura el evento del formulario de Login, envía los datos a la API
+ * y gestiona el almacenamiento de la respuesta (Token JWT).
  */
 function handleLogin(e) {
     e.preventDefault();
@@ -124,7 +145,7 @@ function handleLogin(e) {
     const $submitBtn = $(e.target).find('button[type="submit"]');
     $submitBtn.prop('disabled', true).text('Iniciando...');
 
-    apiCall('login.php', 'POST', { username, password })
+    apiCall('/login', 'POST', { username, password })
         .then(response => {
             if (response.success && response.token) {
                 currentUser = response.user;
@@ -148,11 +169,11 @@ function handleLogin(e) {
 }
 
 /**
- * Maneja el logout
+ * Limpia todas las variables de sesión y redirige al modal de login.
  */
 function handleLogout(e) {
     e.preventDefault();
-    apiCall('logout.php', 'POST').always(() => {
+    apiCall('/logout', 'POST').always(() => {
         sessionStorage.removeItem('currentUser');
         sessionStorage.removeItem('authToken');
         currentUser = null;
@@ -195,7 +216,7 @@ function handleRegister(e) {
     $("#registerError").addClass('hidden');
     const $btn = $(e.target).find('button[type="submit"]');
     $btn.prop('disabled', true).text('Registrando...');
-    apiCall('register.php', 'POST', { username, email, password })
+    apiCall('/register', 'POST', { username, email, password })
         .then(res => {
             if (res && res.success) {
                 showNotification('Usuario creado. Revisa tu correo para el código.', 'success');
@@ -219,7 +240,7 @@ function handleVerify(e) {
     $("#verifyError").addClass('hidden');
     const $btn = $(e.target).find('button[type="submit"]');
     $btn.prop('disabled', true).text('Verificando...');
-    apiCall('verify-token.php', 'POST', { usernameOrEmail, token })
+    apiCall('/api/verify-token', 'POST', { usernameOrEmail, token })
         .then(res => {
             if (res && res.success) {
                 showNotification('Cuenta verificada. Ahora puedes iniciar sesión.', 'success');

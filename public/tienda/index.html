@@ -6,6 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Calzado Nica - Tienda Online</title>
   <link rel="stylesheet" href="/tienda/css/tienda.css">
+  <link rel="icon" href="/favicon.ico" />
 </head>
 
 <body>
@@ -130,7 +131,32 @@
     </div>
   </div>
 
-  <script src="/tienda/js/tienda.js"></script>
+    <!-- Modal de Verificación (Tienda) -->
+    <div class="modal" id="verify-modal-store">
+      <div class="modal-content">
+        <button class="modal-close" onclick="document.getElementById('verify-modal-store').classList.remove('active')">&times;</button>
+        <h3>Verifica tu cuenta</h3>
+        <p id="verify-instructions">Hemos enviado un token a tu correo. Pega el token abajo para verificar tu cuenta.</p>
+        <form id="verify-form-store" onsubmit="return window.handleVerifyStore && window.handleVerifyStore(event)">
+          <div class="form-group">
+            <label>Correo o usuario</label>
+            <input type="text" id="verify-usernameOrEmail-store" required>
+          </div>
+          <div class="form-group">
+            <label>Token de verificación</label>
+            <input type="text" id="verify-token-store" required>
+          </div>
+          <div class="error-message" id="verify-error-store"></div>
+          <div class="success-message" id="verify-success-store"></div>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <button type="submit" class="btn-submit">Verificar</button>
+            <button type="button" id="resend-token-btn-store" class="btn-submit" style="background:#eee;color:#333;" onclick="window.resendTokenStore && window.resendTokenStore()">Reenviar token</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <script src="/tienda/js/tienda.js"></script>
 </body>
 
 </html>
