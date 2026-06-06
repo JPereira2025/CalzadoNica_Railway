@@ -26,6 +26,7 @@
     try {
       currentDiscount = null;
       localStorage.removeItem('cn_discount');
+      localStorage.removeItem('cn_discount_applied');
       const montoEl = document.getElementById('monto-descuento'); if (montoEl) montoEl.textContent = '';
       const aplicado = document.getElementById('descuento-aplicado'); if (aplicado) aplicado.textContent = '';
       const fila = document.getElementById('fila-descuento'); if (fila) fila.style.display = 'none';
@@ -577,8 +578,8 @@
       .then(data => {
         if (data && data.codigo) {
           currentDiscount = { id: data.id, porcentaje: Number(data.porcentaje_descuento) };
-          // persistir descuento para que no se pierda al navegar
-          try { localStorage.setItem('cn_discount', JSON.stringify(currentDiscount)); } catch (e) {}
+          // persistir descuento para que no se pierda al navegar y marcar que el usuario lo aplicó
+          try { localStorage.setItem('cn_discount', JSON.stringify(currentDiscount)); localStorage.setItem('cn_discount_applied','1'); } catch (e) {}
           // mostrar monto descontado junto al porcentaje
           try {
             const cart = getCart();
@@ -702,6 +703,9 @@
       // usar el ID devuelto por el servidor (ej: FACT003-260605-2309)
       const facturaId = data.id || data.facturaId || data.numero || null;
       localStorage.removeItem(CART_KEY);
+      // limpiar descuento persistido al confirmar pedido
+      localStorage.removeItem('cn_discount');
+      localStorage.removeItem('cn_discount_applied');
       actualizarCartCount();
       mostrarConfirmacion(facturaId || 'Pedido registrado');
       currentDiscount = null;
@@ -1073,7 +1077,7 @@
     // restaurar descuento aplicado (persistido en localStorage)
     try {
       const stored = localStorage.getItem('cn_discount');
-      if (stored) {
+      if (stored && localStorage.getItem('cn_discount_applied') === '1') {
         const parsed = JSON.parse(stored);
         if (parsed && parsed.id && Number(parsed.porcentaje) > 0) {
           currentDiscount = parsed;
@@ -1090,7 +1094,7 @@
             document.getElementById('descuento-aplicado') && (document.getElementById('descuento-aplicado').textContent = `-${currentDiscount.porcentaje}%`);
             document.getElementById('fila-descuento') && (document.getElementById('fila-descuento').style.display = '');
           }
-        } else { localStorage.removeItem('cn_discount'); currentDiscount = null; }
+        } else { localStorage.removeItem('cn_discount'); localStorage.removeItem('cn_discount_applied'); currentDiscount = null; }
       }
     } catch (e) { console.warn('No se pudo restaurar descuento', e); }
     if (document.getElementById('productos-grid')) {
