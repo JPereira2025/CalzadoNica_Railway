@@ -961,30 +961,33 @@
     procederAlPago,
     aplicarDescuento,
     inicializarCheckout: function() {
-      // cargar resumen en checkout
+      // proteger en caso de llamadas desde páginas que no contienen elementos de checkout
       const resumenItems = document.getElementById('resumen-items');
+      if (!resumenItems) return; // nada que hacer fuera del checkout
       const cart = getCart();
       let subtotal = 0;
-      resumenItems && (resumenItems.innerHTML = '');
+      resumenItems.innerHTML = '';
       cart.forEach(it => {
         const row = document.createElement('div');
         row.className = 'resumen-item';
-        const itemSubtotal = Number(it.precio) * Number(it.cantidad);
+        const itemSubtotal = Number(it.precio) * Number(it.cantidad || 0);
         subtotal += itemSubtotal;
         const tallaText = it.talla ? ` (Talla: ${it.talla})` : '';
         row.innerHTML = `<span>${it.nombre}${tallaText} x ${it.cantidad}</span><span>${formatCurrency(itemSubtotal)}</span>`;
-        resumenItems && resumenItems.appendChild(row);
+        resumenItems.appendChild(row);
       });
       const descuentoMonto = currentDiscount ? (subtotal * (currentDiscount.porcentaje / 100)) : 0;
       const base = subtotal - descuentoMonto;
       const iva = Number((base * IVA_RATE).toFixed(2));
       const total = Number((base + iva).toFixed(2));
-      document.getElementById('resumen-subtotal').textContent = formatCurrency(subtotal);
+      const subtotalEl = document.getElementById('resumen-subtotal'); if (subtotalEl) subtotalEl.textContent = formatCurrency(subtotal);
+      const descuentoRow = document.getElementById('resumen-descuento-row');
+      const descuentoEl = document.getElementById('resumen-descuento');
       if (currentDiscount) {
-        document.getElementById('resumen-descuento-row') && (document.getElementById('resumen-descuento-row').style.display = '');
-        document.getElementById('resumen-descuento').textContent = `- ${formatCurrency(descuentoMonto)}`;
+        if (descuentoRow) descuentoRow.style.display = '';
+        if (descuentoEl) descuentoEl.textContent = `- ${formatCurrency(descuentoMonto)}`;
       } else {
-        document.getElementById('resumen-descuento-row') && (document.getElementById('resumen-descuento-row').style.display = 'none');
+        if (descuentoRow) descuentoRow.style.display = 'none';
       }
       // mostrar IVA y total
       let ivaRow = document.getElementById('resumen-iva-row');
@@ -993,10 +996,12 @@
         div.className = 'resumen-item';
         div.id = 'resumen-iva-row';
         div.innerHTML = `<span>IVA (${Math.round(IVA_RATE*100)}%)</span><span id="resumen-iva">C$ 0.00</span>`;
-        document.querySelector('.checkout-resumen') && document.querySelector('.checkout-resumen').insertBefore(div, document.querySelector('.resumen-item.total'));
+        const container = document.querySelector('.checkout-resumen');
+        const reference = document.querySelector('.resumen-item.total');
+        if (container && reference) container.insertBefore(div, reference);
       }
-      document.getElementById('resumen-iva') && (document.getElementById('resumen-iva').textContent = formatCurrency(iva));
-      document.getElementById('resumen-total').textContent = formatCurrency(total);
+      const ivaEl = document.getElementById('resumen-iva'); if (ivaEl) ivaEl.textContent = formatCurrency(iva);
+      const totalEl = document.getElementById('resumen-total'); if (totalEl) totalEl.textContent = formatCurrency(total);
       // Bind form
       const form = document.getElementById('checkout-form');
       if (form) form.onsubmit = procesarPedido;
