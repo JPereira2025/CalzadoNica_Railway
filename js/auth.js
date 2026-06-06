@@ -126,6 +126,8 @@ function applyRolePermissions() {
 function showLogin() {
     $("#app").fadeOut(200);
     $("#loginModal").fadeIn(200);
+    // Evitar registro público desde la interfaz administrativa: solo administradores pueden crear usuarios.
+    $("#showRegisterLink").hide();
 }
 
 /**
@@ -145,7 +147,9 @@ function handleLogin(e) {
     const $submitBtn = $(e.target).find('button[type="submit"]');
     $submitBtn.prop('disabled', true).text('Iniciando...');
 
-    apiCall('/login', 'POST', { username, password })
+    console.log(`[AUDIT] Intento de login para usuario: ${username} a las ${new Date().toISOString()}`);
+
+    apiCall('/login', 'POST', { username, password, source: 'AdminPanel_v2.6' })
         .then(response => {
             if (response.success && response.token) {
                 currentUser = response.user;
@@ -159,6 +163,7 @@ function handleLogin(e) {
                 $("#loginError").addClass('hidden');
                 showNotification(`Bienvenido, ${currentUser.username}!`, "success");
                 showApp();
+                console.info(`[AUDIT] Login exitoso: ${currentUser.username} con rol ${currentUser.role}`);
                 navigateTo('dashboard');
             } else {
                 $("#loginError").removeClass("hidden").text(response.message || 'Usuario o contraseña incorrectos. Inténtelo nuevamente.');
@@ -174,6 +179,7 @@ function handleLogin(e) {
 function handleLogout(e) {
     e.preventDefault();
     apiCall('/logout', 'POST').always(() => {
+        console.info(`[AUDIT] Sesión cerrada para: ${currentUser ? currentUser.username : 'Usuario desconocido'} a las ${new Date().toISOString()}`);
         sessionStorage.removeItem('currentUser');
         sessionStorage.removeItem('authToken');
         currentUser = null;
@@ -240,7 +246,7 @@ function handleVerify(e) {
     $("#verifyError").addClass('hidden');
     const $btn = $(e.target).find('button[type="submit"]');
     $btn.prop('disabled', true).text('Verificando...');
-    apiCall('/api/verify-token', 'POST', { usernameOrEmail, token })
+    apiCall('/verify-token', 'POST', { usernameOrEmail, token })
         .then(res => {
             if (res && res.success) {
                 showNotification('Cuenta verificada. Ahora puedes iniciar sesión.', 'success');

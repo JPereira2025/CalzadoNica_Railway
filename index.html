@@ -50,10 +50,17 @@ body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; overflow-x:
 .toggle-checkbox:checked + .toggle-label .toggle-dot { transform: translateX(100%); }
 .readonly-input { background-color: #f3f4f6; }
 .toggle-label { position: relative; display: block; width: 48px; height: 24px; background-color: #ccc; border-radius: 9999px; cursor: pointer; transition: background-color 0.3s; }
-.toggle-dot { position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; background-color: white; border-radius: 50%; transition: transform 0.3s; }
+</style>
+
+<style>
+/* Logos: coloca tus archivos en /images/ con estos nombres */
+.sidebar-logo { width: 44px; height: 44px; object-fit: contain; }
+.header-logo { width: 84px; height: 84px; object-fit: contain; margin-right: 12px; }
 </style>
 </head>
 <body class="bg-gray-100 min-h-screen">
+
+<!-- Nota: sube tus imágenes a `images/calzado_nica_logo.png` -->
 
 <!-- Login Modal -->
 <!-- 
@@ -62,9 +69,10 @@ body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; overflow-x:
 -->
 <div id="loginModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center">
 <div class="bg-white rounded-lg shadow-lg p-8 max-w-md w-full mx-4">
-<div class="text-center mb-8">
-<h2 class="text-3xl font-bold text-gray-800 mb-2">Calzado Nica</h2>
-<p class="text-gray-600">Sistema de Gestión</p>
+<div class="text-center mb-8 flex flex-col items-center gap-2">
+    <img src="images/calzado_nica_logo.png" alt="Calzado Nica" class="header-logo">
+    <h2 class="text-3xl font-bold text-gray-800 mb-2">Calzado Nica</h2>
+    <p class="text-gray-600">Sistema de Gestión</p>
 </div>
 <form id="loginForm" class="space-y-6">
 <div>
@@ -161,8 +169,8 @@ body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; overflow-x:
 <!-- Sidebar -->
 <div id="sidebar" class="sidebar bg-blue-800 text-white w-64 space-y-6 py-7 px-2 absolute inset-y-0 left-0 transform -translate-x-full md:relative md:translate-x-0 z-20">
 <div class="flex items-center space-x-2 px-4">
-<i class="fas fa-shoe-prints text-2xl"></i>
-<h2 class="text-2xl font-bold logo-text">Calzado Nica</h2>
+    <img id="sidebar-logo" class="sidebar-logo" src="images/calzado_nica_logo.png" alt="Calzado Nica">
+    <h2 class="text-2xl font-bold logo-text">Calzado Nica</h2>
 </div>
 <nav class="mt-10">
 <a href="#dashboard" class="sidebar-link flex items-center space-x-3 px-4 py-3 rounded-lg text-white opacity-70 hover:opacity-100">
@@ -198,7 +206,8 @@ body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; overflow-x:
 <header class="bg-white shadow">
 <div class="flex items-center justify-between py-4 px-6">
 <div class="flex items-center">
-<h1 id="page-title" class="text-xl font-semibold text-gray-800">Dashboard</h1>
+    <img id="header-logo" class="header-logo hidden sm:inline-block" src="images/calzado_nica_logo.png" alt="Calzado Nica">
+    <h1 id="page-title" class="text-xl font-semibold text-gray-800">Dashboard</h1>
 </div>
 <div class="flex items-center gap-4">
 <!-- Indicador de rol del usuario actual -->

@@ -26,7 +26,7 @@ try {
 
 if (-not $conns) {
   # Fallback: usar netstat y parsear salida
-  $lines = netstat -ano | findstr ":$Port " 2>$null
+  $lines = netstat -ano | findstr ":${Port} " 2>$null
   if ($lines) {
     $pids = $lines -replace '^\s*[^\s]+\s+[^\s]+\s+[^\s]+\s+','' | ForEach-Object { $_.Trim() } | Select-Object -Unique
   } else {
@@ -43,7 +43,7 @@ if ($pids -and $pids.Count -gt 0) {
       Write-Output "Terminado proceso PID $targetPid que estaba usando el puerto $Port"
     } catch {
       $errMsg = $_.Exception.Message
-      Write-Output ("No se pudo terminar el proceso PID {0}: {1}" -f $targetPid, $errMsg)
+      Write-Output ('No se pudo terminar el proceso PID {0}: {1}' -f $targetPid, $errMsg)
     }
   }
 } else {

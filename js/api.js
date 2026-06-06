@@ -1,11 +1,19 @@
 // --- CONFIGURACIÓN DE LA API ---
 
-// Si estamos en el mismo servidor, usamos rutas relativas para evitar errores de origen
-const API_BASE = window.location.origin + '/';
+// Determina la base de la API automáticamente.
+// Si la web está siendo servida por Apache en localhost (puerto 80),
+// redirigimos las llamadas al backend Node que corre en el puerto 3001.
+const ORIGIN = window.location.origin;
+let API_BASE = ORIGIN + '/';
+if (window.location.hostname === 'localhost' && (window.location.port === '' || window.location.port === '80')) {
+    API_BASE = 'http://localhost:3001/';
+}
 
 function mapEndpoint(endpoint) {
     if (!endpoint) return API_BASE;
     const [path, qs] = endpoint.split('?');
+    // Normalizar: quitar cualquier barra inicial para evitar '//' en la URL
+    const cleanPath = path.replace(/^\/+/, '');
     const mapping = {
         'login.php': 'login',
         'register.php': 'register',
@@ -20,7 +28,7 @@ function mapEndpoint(endpoint) {
         'usuarios.php': 'api/usuarios',
         'stats.php': 'api/stats'
     };
-    const base = mapping[path] || path;
+    const base = mapping[cleanPath] || cleanPath;
     return API_BASE + base + (qs ? ('?' + qs) : '');
 }
 
@@ -56,8 +64,8 @@ function apiCall(endpoint, method = 'GET', data = null) {
             }
         }
 
-        console.error(`Error en API call a ${endpoint}:`, status, error);
-        console.error('Respuesta del servidor:', xhr.responseText);
+        const timestamp = new Date().toISOString();
+        console.error(`[${timestamp}] [API_FAILURE] Path: ${endpoint} | Status: ${xhr.status} | Error: ${error}`);
         
         let errorMessage = `Error al comunicarse con el servidor: ${status}`;
         if (error === 'parsererror') {

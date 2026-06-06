@@ -7,13 +7,23 @@
   <title>Calzado Nica - Tienda Online</title>
   <link rel="stylesheet" href="/tienda/css/tienda.css">
   <link rel="icon" href="/favicon.ico" />
+  <style>
+    /* Logo en navbar */
+    .store-logo-small { height: 56px; vertical-align: middle; margin-right: 8px; }
+    /* Logo grande junto a bienvenida */
+    .store-hero { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+    .store-logo-large { height: 220px; width: auto; }
+    .store-hero h1 { margin: 0; font-size: 2.25rem; }
+    .store-hero-right { display:flex; gap:12px; align-items:center; }
+    .store-side-logo { height:192px; width:auto; box-shadow: 0 6px 18px rgba(0,0,0,0.12); border-radius:6px; background:#fff; padding:6px; }
+  </style>
 </head>
 
 <body>
   <!-- Navbar -->
   <nav class="navbar">
     <div class="navbar-content">
-      <a href="/" class="logo">👟 Calzado Nica</a>
+      <a href="/" class="logo"><img src="img/calzado_nica_logo.png" alt="Calzado Nica" class="store-logo-small">Calzado Nica</a>
       <div class="nav-links">
         <select id="nav-productos" class="nav-productos">
           <option value="">Productos</option>
@@ -37,8 +47,19 @@
 
   <!-- Hero -->
   <section class="hero">
-    <h1>¡Bienvenido a Calzado Nica!</h1>
-    <p>Encuentra los mejores zapatos al mejor precio</p>
+    <div class="store-hero">
+      <div class="store-hero-left" style="display:flex;align-items:center;gap:16px;">
+        <img src="img/calzado_nica_logo.png" alt="Calzado Nica" class="store-logo-large">
+        <div>
+          <h1>¡Bienvenido a Calzado Nica!</h1>
+          <p>Encuentra los mejores zapatos al mejor precio</p>
+        </div>
+      </div>
+      <div class="store-hero-right">
+        <img src="img/logo_cuero.png" alt="Logo Cuero" class="store-side-logo">
+        <img src="img/logo_bordado.png" alt="Logo Bordado" class="store-side-logo">
+      </div>
+    </div>
   </section>
 
   <!-- Contenido Principal -->

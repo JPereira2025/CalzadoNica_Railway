@@ -1,0 +1,25 @@
+<div id="dashboard-page" class="page">
+<div class="bg-white rounded-lg shadow-md p-6">
+<div class="mb-6">
+<div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+<div>
+<h2 class="text-2xl font-bold text-gray-800 mb-2">¡Bienvenido al Sistema!</h2>
+<p class="text-gray-600 mb-4">Has iniciado sesión correctamente. Usa el menú de la izquierda para navegar.</p>
+</div>
+<p class="text-sm text-blue-500 italic text-right font-bold">  Jorge Alberto Pereira - Gerente General</p>
+</div>
+<p class="text-sm text-gray-500 italic">Calzado Nica - Tu tienda de confianza desde 1995</p>
+</div>
+
+<!-- Carrusel de imágenes -->
+<div class="relative w-full h-96 overflow-hidden rounded-lg shadow-lg">
+<!-- Contenedor de imágenes -->
+<div class="carousel-container relative h-full">
+<!-- Imagen 1: Zapatos Fila -->
+<div class="carousel-slide absolute inset-0 transition-opacity duration-1000">
+<img src="images/Fila_Shoes.jpg" alt="Zapatos Fila" class="w-full h-full object-cover">
+<div class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-4">
+<h3 class="text-white text-xl font-bold">Colección Fila</h3>
+<p class="text-white/80">Estilo y comodidad para deportistas</p>
+</div>
+</div>

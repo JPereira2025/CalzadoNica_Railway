@@ -104,6 +104,11 @@ function setupEventListeners() {
             navigateTo('categorias', openCategoriaModal);
         }
     });
+    $(document).on('click', '#btn-quick-manage-usuarios', function() {
+        if (ensureAdminAction('gestionar usuarios')) {
+            navigateTo('usuarios');
+        }
+    });
 }
 
 /**

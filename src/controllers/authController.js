@@ -41,26 +41,8 @@ async function login(req, res, next) {
   }
 
   try {
-    // 1. Intentamos buscar primero en la tabla de Usuarios Internos
-    let user = await prisma.usuarios.findFirst({
-      where: { OR: [{ username: username }, { email: username }] }
-    });
-
-    let isClient = false;
-
-    // 2. Si no es un usuario interno, buscamos en la tabla de Clientes
-    if (!user) {
-      user = await prisma.clientes.findUnique({
-        where: { email: username }
-      });
-      if (user) {
-        isClient = true;
-        // Adaptamos el objeto cliente para que sea compatible con el resto del flujo
-        user.username = user.email;
-        user.role = 'Cliente';
-        user.verified = user.verificado;
-      }
-    }
+    // Buscar únicamente en la tabla de usuarios internos (webapp)
+    let user = await prisma.usuarios.findFirst({ where: { OR: [{ username: username }, { email: username }] } });
 
     // Validaciones de existencia y verificación
     if (!user) {
@@ -89,14 +71,10 @@ async function login(req, res, next) {
       return next({ status: 401, message: 'Contraseña incorrecta' });
     }
 
-    // Actualización de seguridad de contraseña si es necesario
+    // Actualización de seguridad de contraseña si es necesario (solo usuarios internos)
     if (needsRehash) {
       const newHash = await bcrypt.hash(password, 10);
-      const targetTable = isClient ? prisma.clientes : prisma.usuarios;
-      await targetTable.update({
-        where: { id: user.id },
-        data: { password: newHash }
-      });
+      await prisma.usuarios.update({ where: { id: user.id }, data: { password: newHash } });
     }
 
     const token = jwt.sign({ id: user.id, username: user.username, role: user.role }, JWT_SECRET, {
@@ -369,3 +347,49 @@ module.exports = {
   verifyToken,
   resendToken
 };
+
+/**
+ * Login para la tienda pública (clientes).
+ * Usa la tabla `clientes` exclusivamente y retorna token con role 'Cliente'.
+ */
+async function loginStore(req, res, next) {
+  const { username, password } = req.body;
+
+  if (!username || !password) {
+    return next({ status: 400, message: 'El usuario/email y la contraseña son requeridos' });
+  }
+
+  try {
+    const cliente = await prisma.clientes.findFirst({ where: { email: username } });
+    if (!cliente) return next({ status: 401, message: 'El usuario o correo electrónico no existe' });
+    if (cliente.verificado === false) return next({ status: 403, message: 'Cuenta no verificada' });
+
+    let authenticated = false;
+    let needsRehash = false;
+
+    if (cliente.password && cliente.password.startsWith && cliente.password.startsWith('$argon2')) {
+      try { authenticated = await argon2.verify(cliente.password, password); } catch (err) { authenticated = false; }
+    } else if (await bcrypt.compare(password, cliente.password)) {
+      authenticated = true;
+    } else if (password === cliente.password) {
+      authenticated = true;
+      needsRehash = true;
+    }
+
+    if (!authenticated) return next({ status: 401, message: 'Contraseña incorrecta' });
+
+    if (needsRehash) {
+      const newHash = await bcrypt.hash(password, 10);
+      await prisma.clientes.update({ where: { id: cliente.id }, data: { password: newHash } });
+    }
+
+    const token = jwt.sign({ id: cliente.id, username: cliente.email, role: 'Cliente' }, JWT_SECRET, { expiresIn: '8h' });
+
+    res.json({ success: true, user: { id: cliente.id, username: cliente.email, role: 'Cliente' }, token });
+  } catch (error) {
+    next(error);
+  }
+}
+
+// Exponer loginStore también
+module.exports.loginStore = loginStore;

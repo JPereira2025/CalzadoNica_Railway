@@ -576,7 +576,7 @@
     const email = form.querySelector('input[name="email"]').value;
     const password = form.querySelector('input[name="password"]').value;
     try {
-      const res = await fetch('/login', { method: 'POST', headers: { 'Content-Type':'application/json' }, body: JSON.stringify({ username: email, password }) });
+      const res = await fetch('/tienda/login', { method: 'POST', headers: { 'Content-Type':'application/json' }, body: JSON.stringify({ username: email, password }) });
       const data = await res.json();
       if (!res.ok || !data.success) {
         const el = document.getElementById('login-error'); if (el) { el.textContent = data.message || 'Error autenticando'; el.style.display = 'block'; }

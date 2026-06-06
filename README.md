@@ -42,6 +42,14 @@ HOST=0.0.0.0
 npm run dev:api
 ```
 
+### Rutas de entrada (URLs)
+
+- **Webapp (XAMPP/htdocs):** http://localhost/CalzadoNica/  — ejemplo: "Sistema Calzado Nica - v2.6 (Final)"
+- **API / servidor de desarrollo (Node/Express):** http://localhost:3001/  — si ves "Cannot GET /" arranca el servidor con `npm run dev:api`.
+- **Tienda pública (archivos estáticos):** http://localhost:3001/tienda/  — contenido en `public/tienda/`.
+
+> Nota: si colocaste la carpeta del proyecto en `htdocs` (XAMPP), la webapp se sirve en `http://localhost/CalzadoNica/`. Cuando el servidor Node está activo en el puerto `3001`, la API y la tienda estarán disponibles en `http://localhost:3001/` y `http://localhost:3001/tienda/` respectivamente.
+
 ---
 
 ## 🎨 Estilos y UI
@@ -64,3 +72,81 @@ powershell -File scripts/free_port_windows.ps1 3001
 ```
 
 Usar con precaución: el script termina procesos por PID que estén escuchando en el puerto indicado; está pensado para limpiar sesiones de `node` colgadas en desarrollo.
+
+---
+
+## Métodos HTTP básicos (GET, POST, PUT, DELETE)
+
+Breve explicación y ejemplos prácticos para interactuar con la API de `CalzadoNica`.
+
+- GET: recuperar datos (no modifica el servidor).
+
+	Ejemplo — obtener todos los productos:
+
+	```bash
+	curl -s -X GET http://localhost:3001/api/productos
+	```
+
+- POST: crear un recurso (normalmente enviando JSON). Muchas rutas administrativas requieren un token JWT en `Authorization`.
+
+	Ejemplo — crear un producto (requiere token de administrador):
+
+	```bash
+	curl -s -X POST http://localhost:3001/api/productos \
+		-H "Authorization: Bearer <TOKEN_ADMIN>" \
+		-H "Content-Type: application/json" \
+		-d '{"id":"P-001","marca":"MiMarca","modelo":"Modelo1","talla":"42","precio":1200,"stock":10}'
+	```
+
+- PUT: actualizar un recurso existente; en esta API se envía el `id` y los campos a actualizar en el body.
+
+	Ejemplo — actualizar precio y stock:
+
+	```bash
+	curl -s -X PUT http://localhost:3001/api/productos \
+		-H "Authorization: Bearer <TOKEN_ADMIN>" \
+		-H "Content-Type: application/json" \
+		-d '{"id":"P-001","precio":1299.99,"stock":8}'
+	```
+
+- DELETE: eliminar un recurso; normalmente se pasa `id` en la query string.
+
+	Ejemplo — eliminar producto:
+
+	```bash
+	curl -s -X DELETE "http://localhost:3001/api/productos?id=P-001" \
+		-H "Authorization: Bearer <TOKEN_ADMIN>"
+	```
+
+Notas:
+- Reemplaza `<TOKEN_ADMIN>` por un JWT obtenido con `/login` usando un usuario administrador.
+- Muchas rutas públicas (por ejemplo `GET /api/productos`) no requieren autenticación.
+
+Obtener lista de productos (GET)
+curl -s -X GET http://localhost:3001/api/productos
+
+Logearse y obtener el token (POST /login)
+curl -s -X POST http://localhost:3001/login -H "Content-Type: application/json" -d '{"username":"admin","password":"admin123"}'
+
+Crear un producto (POST /api/productos)
+curl -s -X POST http://localhost:3001/api/productos \
+  -H "Authorization: Bearer <TOKEN_ADMIN>" \
+  -H "Content-Type: application/json" \
+  -d '{"id":"P-001","marca":"MiMarca","modelo":"Modelo1","talla":"42","precio":1200,"stock":10}'
+  
+
+  Actualizar producto (PUT /api/productos):
+ curl -s -X PUT http://localhost:3001/api/productos \
+  -H "Authorization: Bearer <TOKEN_ADMIN>" \
+  -H "Content-Type: application/json" \
+  -d '{"id":"P-001","precio":1299.99,"stock":8}'
+
+   Eliminar producto (DELETE /api/productos?id=...):
+   curl -s -X DELETE "http://localhost:3001/api/productos?id=P-001" \
+  -H "Authorization: Bearer <TOKEN_ADMIN>"
+
+Opción automática en PowerShell (intenta extraer el token a $token):
+$resp = curl -s -X POST http://localhost:3001/login -H "Content-Type: application/json" -d '{"username":"admin","password":"admin123"}'
+$token = ($resp | ConvertFrom-Json).token
+Write-Host "TOKEN:" $token
+  
