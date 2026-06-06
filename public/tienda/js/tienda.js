@@ -735,8 +735,19 @@
   }
 
   // Stubs para auth modal (simple UX)
-  function abrirModal(tab) { document.getElementById('auth-modal')?.classList.add('active'); cambiarTab(tab); }
-  function cerrarModal() { document.getElementById('auth-modal')?.classList.remove('active'); }
+  function abrirModal(tab) {
+    const m = document.getElementById('auth-modal');
+    if (m) { m.style.display = ''; m.classList.add('active'); }
+    cambiarTab(tab);
+  }
+  function cerrarModal() {
+    const m = document.getElementById('auth-modal');
+    if (m) { m.classList.remove('active'); m.style.display = 'none'; }
+    // limpiar posibles mensajes de error en los formularios
+    const loginErr = document.getElementById('login-error'); if (loginErr) { loginErr.textContent = ''; loginErr.style.display = 'none'; }
+    const registerErr = document.getElementById('register-error'); if (registerErr) { registerErr.textContent = ''; registerErr.style.display = 'none'; }
+    const registerSuc = document.getElementById('register-success'); if (registerSuc) { registerSuc.textContent = ''; registerSuc.style.display = 'none'; }
+  }
   function cambiarTab(tab) {
     document.querySelectorAll('.modal-tab').forEach(el => el.classList.toggle('active', el.dataset.tab === tab));
     document.querySelectorAll('.modal-form').forEach(f => f.classList.toggle('active', f.id.startsWith(tab)));
