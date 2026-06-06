@@ -207,6 +207,7 @@ function showVerify() {
 
 function hideVerify() {
     $("#verifyModal").fadeOut(150);
+    $("#registerModal").fadeOut(150);
     $("#loginModal").fadeIn(150);
 }
 
@@ -222,7 +223,18 @@ function handleRegister(e) {
     $("#registerError").addClass('hidden');
     const $btn = $(e.target).find('button[type="submit"]');
     $btn.prop('disabled', true).text('Registrando...');
-    apiCall('/register', 'POST', { username, email, password })
+    // recoger direcciones si están presentes en el formulario
+    const provincia = $("#reg-provincia").val() ? $("#reg-provincia").val().trim() : '';
+    const ciudad = $("#reg-ciudad").val() ? $("#reg-ciudad").val().trim() : '';
+    const direccion = $("#reg-direccion").val() ? $("#reg-direccion").val().trim() : '';
+    const guardarDireccion = $("#reg-guardarDireccion").is(':checked');
+
+    const payload = { username, email, password };
+    if (direccion || provincia || ciudad) {
+        payload.direccion = { provincia, ciudad, direccion, predeterminada: !!guardarDireccion };
+    }
+
+    apiCall('/register', 'POST', payload)
         .then(res => {
             if (res && res.success) {
                 showNotification('Usuario creado. Revisa tu correo para el código.', 'success');

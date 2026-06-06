@@ -1,5 +1,5 @@
 const express = require('express');
-const { login, logout, register, verifyToken, resendToken, loginStore } = require('../controllers/authController');
+const { login, logout, register, verifyToken, resendToken, loginStore, updateProfileStore } = require('../controllers/authController');
 const { authenticateToken, requireAdmin } = require('../middlewares/auth');
 const router = express.Router();
 
@@ -26,6 +26,8 @@ router.post('/verify-token', verifyToken);
 router.post('/login', login);
 // Login para la tienda pública (clientes) — ruta separada
 router.post('/tienda/login', loginStore);
+// Actualizar perfil del cliente (dirección)
+router.put('/tienda/profile', authenticateToken, updateProfileStore);
 router.post('/logout', logout);
 
 module.exports = router;

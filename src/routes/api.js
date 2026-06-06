@@ -111,6 +111,11 @@ router.get('/facturas', getFacturas);
 router.post('/facturas', createFactura);
 router.delete('/facturas', deleteFactura);
 
+// Clientes (admin)
+const { getClientes, updateCliente } = require('../controllers/apiController');
+router.get('/clientes', authenticateToken, requireAdmin, getClientes);
+router.put('/clientes', authenticateToken, requireAdmin, updateCliente);
+
 router.get('/stats', getStats);
 
 module.exports = router;

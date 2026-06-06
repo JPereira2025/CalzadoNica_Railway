@@ -196,6 +196,56 @@ async function getUsuarios(req, res) {
   }
 }
 
+async function getClientes(req, res) {
+  try {
+    const { id, email } = req.query;
+    if (id || email) {
+      const where = id ? { id: Number(id) } : { email: String(email) };
+      const cliente = await prisma.clientes.findFirst({ where, include: { direcciones: true } });
+      return res.json(cliente || {});
+    }
+    const clientes = await prisma.clientes.findMany({ include: { direcciones: true }, orderBy: { fecha_registro: 'desc' } });
+    res.json(clientes);
+  } catch (error) {
+    console.error('GET CLIENTES ERROR:', error);
+    res.status(500).json({ success: false, message: 'Error al listar clientes' });
+  }
+}
+
+async function updateCliente(req, res) {
+  try {
+    const { id, email, nombres, apellidos, telefono, provincia, ciudad, direccion_exacta, es_predeterminada } = req.body;
+    if (!id && !email) return res.status(400).json({ success: false, message: 'Se requiere id o email del cliente' });
+    const where = id ? { id: Number(id) } : { email: String(email) };
+    const cliente = await prisma.clientes.findFirst({ where });
+    if (!cliente) return res.status(404).json({ success: false, message: 'Cliente no encontrado' });
+
+    const clienteData = {};
+    if (nombres !== undefined) clienteData.nombres = String(nombres);
+    if (apellidos !== undefined) clienteData.apellidos = String(apellidos);
+    if (telefono !== undefined) clienteData.telefono = String(telefono);
+
+    if (Object.keys(clienteData).length) {
+      await prisma.clientes.update({ where: { id: cliente.id }, data: clienteData });
+    }
+
+    // manejar dirección
+    if (provincia || ciudad || direccion_exacta) {
+      const existing = await prisma.direcciones.findFirst({ where: { cliente_id: cliente.id, es_predeterminada: true } });
+      if (existing) {
+        await prisma.direcciones.update({ where: { id: existing.id }, data: { provincia: provincia || existing.provincia, ciudad: ciudad || existing.ciudad, direccion_exacta: direccion_exacta || existing.direccion_exacta, telefono: telefono || existing.telefono } });
+      } else {
+        await prisma.direcciones.create({ data: { cliente_id: cliente.id, nombre: `${nombres || cliente.nombres || ''} ${apellidos || cliente.apellidos || ''}`.trim() || '', telefono: telefono || '', provincia: provincia || '', ciudad: ciudad || '', direccion_exacta: direccion_exacta || '', es_predeterminada: !!es_predeterminada } });
+      }
+    }
+
+    res.json({ success: true, message: 'Cliente actualizado' });
+  } catch (error) {
+    console.error('UPDATE CLIENTE ERROR:', error);
+    res.status(500).json({ success: false, message: 'Error al actualizar cliente' });
+  }
+}
+
 async function createUsuario(req, res) {
   const { username, email, password, role, verified } = req.body;
 
@@ -737,6 +787,12 @@ async function getCodigos(req, res) {
     const { id, codigo } = req.query;
     if (id) {
       const codigoDb = await prisma.codigos_promocionales.findUnique({ where: { id: String(id) } });
+      if (!codigoDb) return res.json({});
+      // validar fecha/estado igual que cuando se consulta por código
+      const now = new Date();
+      if (!codigoDb.estado) return res.json({ status: 'inactive', message: 'Código inactivo' });
+      if (now < codigoDb.fecha_inicio) return res.json({ status: 'not_started', message: 'Código aún no válido' });
+      if (now > codigoDb.fecha_fin) return res.json({ status: 'expired', message: 'Código vencido' });
       return res.json(codigoDb || {});
     }
 
@@ -863,11 +919,34 @@ async function getFacturas(req, res) {
 
 async function createFactura(req, res) {
   const { id, cliente, vendedor, items, subtotal, monto_descuento, iva, total, codigo_descuento } = req.body;
-  if (!id || !cliente || !vendedor || !Array.isArray(items) || items.length === 0) {
+  if (!cliente || !vendedor || !Array.isArray(items) || items.length === 0) {
     return res.status(400).json({ success: false, message: 'Faltan campos requeridos para crear factura' });
   }
 
   try {
+    // intentar resolver dirección del cliente si se trata de un cliente registrado
+    let clienteDisplay = String(cliente);
+    try {
+      // cliente puede ser email o id; intentamos buscar en clientes por email
+      let foundCliente = null;
+      if (cliente && String(cliente).match(/^\d+$/)) {
+        // si es numérico, buscar por id
+        foundCliente = await prisma.clientes.findUnique({ where: { id: Number(cliente) } });
+      }
+      if (!foundCliente) {
+        foundCliente = await prisma.clientes.findFirst({ where: { email: String(cliente) } });
+      }
+      if (foundCliente) {
+        const dir = await prisma.direcciones.findFirst({ where: { cliente_id: foundCliente.id, es_predeterminada: true } });
+        const name = `${foundCliente.nombres || ''} ${foundCliente.apellidos || ''}`.trim() || foundCliente.email;
+        if (dir) {
+          clienteDisplay = `${name} — ${dir.provincia || ''}, ${dir.ciudad || ''}, ${dir.direccion_exacta || ''}`;
+        } else {
+          clienteDisplay = name;
+        }
+      }
+    } catch (lookupErr) { console.warn('No se pudo resolver dirección del cliente para la factura', lookupErr); }
+
     const productoIds = items.map(item => String(item.id));
     const productos = await prisma.productos.findMany({ where: { id: { in: productoIds } } });
     const productoMap = new Map(productos.map(p => [p.id, p]));
@@ -882,6 +961,24 @@ async function createFactura(req, res) {
       }
     }
 
+    // asegurar que existe un id válido para la factura (generar si el cliente no lo envía)
+    const now = new Date();
+    let facturaId = id ? String(id) : null;
+    if (!facturaId) {
+      // calcular correlativo del año actual: contar facturas con fecha en este año y sumar 1
+      const year = now.getFullYear();
+      const startOfYear = new Date(year, 0, 1);
+      const startOfNextYear = new Date(year + 1, 0, 1);
+      const countThisYear = await prisma.facturas.count({ where: { fecha: { gte: startOfYear, lt: startOfNextYear } } });
+      const seq = countThisYear + 1;
+      const yy = String(year).slice(-2);
+      const MM = String(now.getMonth() + 1).padStart(2, '0');
+      const dd = String(now.getDate()).padStart(2, '0');
+      const hh = String(now.getHours()).padStart(2, '0');
+      const min = String(now.getMinutes()).padStart(2, '0');
+      facturaId = `FACT${String(seq).padStart(3, '0')}-${yy}${MM}${dd}-${hh}${min}`;
+    }
+
     const factura = await prisma.$transaction(async tx => {
       await Promise.all(items.map(item => {
         const producto = productoMap.get(String(item.id));
@@ -893,8 +990,8 @@ async function createFactura(req, res) {
 
       const createdFactura = await tx.facturas.create({
         data: {
-          id: String(id),
-          cliente: String(cliente),
+          id: facturaId,
+          cliente: clienteDisplay,
           vendedor: String(vendedor),
           fecha: new Date(),
           subtotal: Number(subtotal),
@@ -1007,5 +1104,7 @@ module.exports = {
   getFacturas,
   createFactura,
   deleteFactura,
-  getStats
+  getStats,
+  getClientes,
+  updateCliente
 };

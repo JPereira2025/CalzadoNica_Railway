@@ -455,8 +455,15 @@
       document.getElementById('fila-descuento') && (document.getElementById('fila-descuento').style.display = '');
       const montoEl = document.getElementById('monto-descuento');
       if (montoEl) montoEl.textContent = `-` + formatCurrency(descuentoMonto);
+      // mostrar indicador pequeño junto al input de código
+      const disp = document.getElementById('descuento-aplicado'); if (disp) disp.textContent = `- ${formatCurrency(descuentoMonto)} (${currentDiscount.porcentaje}%)`;
+      const quitarBtn = document.getElementById('quitar-descuento-btn'); if (quitarBtn) quitarBtn.style.display = '';
     } else {
-      document.getElementById('fila-descuento') && (document.getElementById('fila-descuento').style.display = 'none');
+      // ocultar fila de descuento y limpiar textos para evitar que el porcentaje se muestre "solo"
+      const fila = document.getElementById('fila-descuento'); if (fila) fila.style.display = 'none';
+      const montoEl = document.getElementById('monto-descuento'); if (montoEl) montoEl.textContent = '';
+      const disp = document.getElementById('descuento-aplicado'); if (disp) disp.textContent = '';
+      const quitarBtn = document.getElementById('quitar-descuento-btn'); if (quitarBtn) quitarBtn.style.display = 'none';
     }
     const total = Math.max(0, subtotal - descuentoMonto);
     document.getElementById('total').textContent = formatCurrency(total);
@@ -589,7 +596,7 @@
             if (disp) disp.textContent = `- ${formatCurrency(monto)} (${data.porcentaje_descuento}%)`;
           } catch (e) { document.getElementById('descuento-aplicado') && (document.getElementById('descuento-aplicado').textContent = `-${data.porcentaje_descuento}%`); }
           if (document.getElementById('fila-descuento')) document.getElementById('fila-descuento').style.display = '';
-          const quitarBtn = document.getElementById('quitar-descuento-btn'); if (quitarBtn) quitarBtn.style.display = 'none';
+          const quitarBtn = document.getElementById('quitar-descuento-btn'); if (quitarBtn) quitarBtn.style.display = '';
           // actualizar montos en carrito y checkout
           actualizarUIcarrito();
           if (document.getElementById('resumen-subtotal')) window.tienda.inicializarCheckout();
@@ -679,6 +686,9 @@
     const btn = document.getElementById('btn-confirmar');
     if (btn) { btn.disabled = true; btn.textContent = 'Procesando...'; }
     try {
+      // Actualizar el perfil del cliente con los datos ingresados en el checkout para "guiñar" futuras facturas
+      await actualizarPerfilDesdeCheckout();
+
       // si hay comprobante de pago (archivo), enviar como FormData para incluir archivo
       let res;
       const token = localStorage.getItem('cn_token');
@@ -867,8 +877,11 @@
         return false;
       }
       if (sucEl) { sucEl.textContent = data.message || 'Cuenta verificada'; sucEl.style.display = 'block'; }
-      // cerrar modal tras breve delay
-      setTimeout(()=>{ document.getElementById('verify-modal-store')?.classList.remove('active'); }, 1200);
+      // cerrar modal tras breve delay y también cerrar el modal de registro si está abierto
+      setTimeout(()=>{
+        document.getElementById('verify-modal-store')?.classList.remove('active');
+        try { if (typeof cerrarModal === 'function') cerrarModal(); else document.getElementById('auth-modal')?.classList.remove('active'); } catch (e) { /* noop */ }
+      }, 1200);
       return true;
     } catch (err) {
       console.error('verify error', err);
@@ -903,6 +916,34 @@
     }
   }
 
+  /**
+   * Guarda la dirección del cliente en la DB para futuras compras
+   */
+  async function actualizarPerfilDesdeCheckout() {
+    const user = JSON.parse(localStorage.getItem('cn_user') || 'null');
+    const token = localStorage.getItem('cn_token');
+    if (!user || !token) return;
+
+    const payload = {
+        nombres: document.getElementById('nombres')?.value,
+        apellidos: document.getElementById('apellidos')?.value,
+        telefono: document.getElementById('telefono')?.value,
+        provincia: document.getElementById('provincia')?.value,
+        ciudad: document.getElementById('ciudad')?.value,
+        direccion_exacta: document.getElementById('direccion_exacta')?.value
+    };
+
+    try {
+        const res = await fetch('/tienda/profile', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+            body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (data.success) localStorage.setItem('cn_user', JSON.stringify(data.user));
+    } catch (e) { console.error('Error actualizando perfil', e); }
+  }
+
   function logout() {
     localStorage.removeItem('cn_token');
     localStorage.removeItem('cn_user');
@@ -934,13 +975,13 @@
       try {
         const userData = user || JSON.parse(localStorage.getItem('cn_user') || 'null');
         if (userData) {
-          if (document.getElementById('nombres') && (userData.nombres || userData.firstName)) document.getElementById('nombres').value = userData.nombres || userData.firstName || '';
-          if (document.getElementById('apellidos') && (userData.apellidos || userData.lastName)) document.getElementById('apellidos').value = userData.apellidos || userData.lastName || '';
+          if (document.getElementById('nombres')) document.getElementById('nombres').value = userData.nombres || '';
+          if (document.getElementById('apellidos')) document.getElementById('apellidos').value = userData.apellidos || '';
           if (document.getElementById('email') && (userData.email || userData.username)) document.getElementById('email').value = userData.email || userData.username || '';
           if (document.getElementById('telefono') && userData.telefono) document.getElementById('telefono').value = userData.telefono || '';
-          if (document.getElementById('provincia') && (userData.provincia || (userData.direccion && userData.direccion.provincia))) document.getElementById('provincia').value = userData.provincia || (userData.direccion && userData.direccion.provincia) || '';
-          if (document.getElementById('ciudad') && (userData.ciudad || (userData.direccion && userData.direccion.ciudad))) document.getElementById('ciudad').value = userData.ciudad || (userData.direccion && userData.direccion.ciudad) || '';
-          if (document.getElementById('direccion_exacta') && (userData.direccion_exacta || (userData.direccion && userData.direccion.direccion))) document.getElementById('direccion_exacta').value = userData.direccion_exacta || (userData.direccion && userData.direccion.direccion) || '';
+          if (document.getElementById('provincia')) document.getElementById('provincia').value = userData.provincia || '';
+          if (document.getElementById('ciudad')) document.getElementById('ciudad').value = userData.ciudad || '';
+          if (document.getElementById('direccion_exacta')) document.getElementById('direccion_exacta').value = userData.direccion_exacta || '';
         }
       } catch (e) { /* noop */ }
     } else {
@@ -1073,26 +1114,39 @@
   window.vaciarCarrito = function() { return window.tienda.vaciarCarrito && window.tienda.vaciarCarrito(); };
 
   // Auto-init según página
-  document.addEventListener('DOMContentLoaded', () => {
+  document.addEventListener('DOMContentLoaded', async () => {
     // restaurar descuento aplicado (persistido en localStorage)
     try {
       const stored = localStorage.getItem('cn_discount');
       if (stored && localStorage.getItem('cn_discount_applied') === '1') {
         const parsed = JSON.parse(stored);
-        if (parsed && parsed.id && Number(parsed.porcentaje) > 0) {
-          currentDiscount = parsed;
-          // mostrar monto descontado si hay items en carrito
-          try {
-            const cart = getCart();
-            const subtotal = cart.reduce((s,i) => s + (Number(i.precio) * Number(i.cantidad || 0)), 0);
-            const monto = subtotal * (Number(currentDiscount.porcentaje) / 100);
-            const disp = document.getElementById('descuento-aplicado');
-            if (disp) disp.textContent = `- ${formatCurrency(monto)} (${currentDiscount.porcentaje}%)`;
-            document.getElementById('fila-descuento') && (document.getElementById('fila-descuento').style.display = '');
-            const quitarBtn = document.getElementById('quitar-descuento-btn'); if (quitarBtn) quitarBtn.style.display = 'none';
-          } catch (e) {
-            document.getElementById('descuento-aplicado') && (document.getElementById('descuento-aplicado').textContent = `-${currentDiscount.porcentaje}%`);
-            document.getElementById('fila-descuento') && (document.getElementById('fila-descuento').style.display = '');
+        if (parsed) {
+          // Si viene con id, validamos por id; si viene con codigo (texto), validamos por código.
+          const tryFetchBy = parsed.id ? ('id=' + encodeURIComponent(parsed.id)) : (parsed.codigo ? ('codigo=' + encodeURIComponent(parsed.codigo)) : null);
+          if (!tryFetchBy || Number(parsed.porcentaje) <= 0) {
+            localStorage.removeItem('cn_discount'); localStorage.removeItem('cn_discount_applied'); currentDiscount = null;
+          } else {
+            try {
+              const resp = await fetch('/api/codigos?' + tryFetchBy);
+              const codigoResp = await resp.json();
+              const porcentaje = codigoResp && (codigoResp.porcentaje_descuento !== undefined ? Number(codigoResp.porcentaje_descuento) : (codigoResp.porcentaje !== undefined ? Number(codigoResp.porcentaje) : null));
+              if (codigoResp && codigoResp.id && porcentaje !== null && porcentaje > 0) {
+                currentDiscount = { id: codigoResp.id, porcentaje };
+                const cart = getCart();
+                const subtotal = cart.reduce((s,i) => s + (Number(i.precio) * Number(i.cantidad || 0)), 0);
+                const monto = subtotal * (Number(currentDiscount.porcentaje) / 100);
+                const disp = document.getElementById('descuento-aplicado');
+                if (disp) disp.textContent = `- ${formatCurrency(monto)} (${currentDiscount.porcentaje}%)`;
+                document.getElementById('fila-descuento') && (document.getElementById('fila-descuento').style.display = '');
+                const quitarBtn = document.getElementById('quitar-descuento-btn'); if (quitarBtn) quitarBtn.style.display = '';
+              } else {
+                // código no válido según servidor
+                localStorage.removeItem('cn_discount'); localStorage.removeItem('cn_discount_applied'); currentDiscount = null;
+              }
+            } catch (srvErr) {
+              console.warn('No se pudo validar código de descuento remoto:', srvErr);
+              localStorage.removeItem('cn_discount'); localStorage.removeItem('cn_discount_applied'); currentDiscount = null;
+            }
           }
         } else { localStorage.removeItem('cn_discount'); localStorage.removeItem('cn_discount_applied'); currentDiscount = null; }
       }

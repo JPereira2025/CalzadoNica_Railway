@@ -107,6 +107,9 @@ async function register(req, res, next) {
   const nombres = String(req.body.nombres || '').trim();
   const apellidos = String(req.body.apellidos || '').trim();
   const telefono = String(req.body.telefono || '').trim();
+  const provincia = req.body.direccion?.provincia || '';
+  const ciudad = req.body.direccion?.ciudad || '';
+  const direccion_exacta = req.body.direccion?.direccion || '';
 
   if (!username || !password || !email) {
     return next({ status: 400, message: 'El nombre de usuario, correo y contraseña son obligatorios' });
@@ -128,10 +131,30 @@ async function register(req, res, next) {
           password: hash,
           nombres: nombres || '',
           apellidos: apellidos || '',
-          telefono: telefono || null,
+          telefono: telefono || '',
           verificado: false
         }
       });
+
+      // Si se envió dirección, guardarla en la tabla `direcciones` vinculada al cliente
+      if (provincia || ciudad || direccion_exacta) {
+        try {
+          await prisma.direcciones.create({
+            data: {
+              cliente_id: cliente.id,
+              nombre: `${nombres} ${apellidos}`.trim() || '',
+              telefono: telefono || '',
+              provincia: provincia || '',
+              ciudad: ciudad || '',
+              direccion_exacta: direccion_exacta || '',
+              es_predeterminada: true
+            }
+          });
+        } catch (addrErr) {
+          console.error('ERROR guardando dirección inicial:', addrErr);
+          // No abortar la creación del cliente por fallo al guardar dirección
+        }
+      }
 
       // Generación de token JWT para verificación por email
       const verificationToken = jwt.sign(
@@ -306,6 +329,7 @@ async function resendToken(req, res, next) {
         console.error('MAIL ERROR:', mailErr);
         return next({ status: 500, message: 'Error al reenviar el correo de verificación' });
       }
+      // En modo debug, devolver también el token en la respuesta para pruebas locales
       return res.json({ success: true, message: 'Token reenviado. Revisa tu correo.' });
     }
 
@@ -385,7 +409,69 @@ async function loginStore(req, res, next) {
 
     const token = jwt.sign({ id: cliente.id, username: cliente.email, role: 'Cliente' }, JWT_SECRET, { expiresIn: '8h' });
 
-    res.json({ success: true, user: { id: cliente.id, username: cliente.email, role: 'Cliente' }, token });
+    // Buscar dirección predeterminada del cliente si existe
+    let direccion = null;
+    try {
+      direccion = await prisma.direcciones.findFirst({ where: { cliente_id: cliente.id, es_predeterminada: true } });
+    } catch (dErr) { /* noop */ }
+
+    res.json({ 
+      success: true, 
+      user: { 
+        id: cliente.id, 
+        username: cliente.email, 
+        email: cliente.email,
+        role: 'Cliente',
+        nombres: cliente.nombres,
+        apellidos: cliente.apellidos,
+        telefono: cliente.telefono,
+        provincia: direccion ? direccion.provincia : '',
+        ciudad: direccion ? direccion.ciudad : '',
+        direccion_exacta: direccion ? direccion.direccion_exacta : ''
+      }, 
+      token 
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
+/**
+ * Permite al cliente actualizar su información de contacto y dirección
+ */
+async function updateProfileStore(req, res, next) {
+  try {
+    const { nombres, apellidos, telefono, provincia, ciudad, direccion_exacta } = req.body;
+    const clienteId = req.user.id;
+
+    // Actualizar campos básicos del cliente
+    const updatedCliente = await prisma.clientes.update({
+      where: { id: clienteId },
+      data: { nombres, apellidos, telefono }
+    });
+
+    // Actualizar o crear la dirección predeterminada
+    try {
+      const existingAddr = await prisma.direcciones.findFirst({ where: { cliente_id: clienteId, es_predeterminada: true } });
+      if (existingAddr) {
+        await prisma.direcciones.update({
+          where: { id: existingAddr.id },
+          data: { provincia: provincia || existingAddr.provincia, ciudad: ciudad || existingAddr.ciudad, direccion_exacta: direccion_exacta || existingAddr.direccion_exacta, telefono: telefono || existingAddr.telefono }
+        });
+      } else if (provincia || ciudad || direccion_exacta) {
+        await prisma.direcciones.create({ data: { cliente_id: clienteId, nombre: `${nombres} ${apellidos}`.trim() || '', telefono: telefono || '', provincia: provincia || '', ciudad: ciudad || '', direccion_exacta: direccion_exacta || '', es_predeterminada: true } });
+      }
+    } catch (addrErr) {
+      console.error('ERROR actualizando/creando dirección:', addrErr);
+    }
+
+    // Devolver usuario combinado con su dirección predeterminada actual
+    let direccion = null;
+    try { direccion = await prisma.direcciones.findFirst({ where: { cliente_id: clienteId, es_predeterminada: true } }); } catch (e) { /* noop */ }
+
+    const resultUser = Object.assign({}, updatedCliente, { provincia: direccion ? direccion.provincia : '', ciudad: direccion ? direccion.ciudad : '', direccion_exacta: direccion ? direccion.direccion_exacta : '' });
+
+    res.json({ success: true, message: 'Perfil actualizado', user: resultUser });
   } catch (error) {
     next(error);
   }
@@ -393,3 +479,4 @@ async function loginStore(req, res, next) {
 
 // Exponer loginStore también
 module.exports.loginStore = loginStore;
+module.exports.updateProfileStore = updateProfileStore;
