@@ -579,9 +579,16 @@
           currentDiscount = { id: data.id, porcentaje: Number(data.porcentaje_descuento) };
           // persistir descuento para que no se pierda al navegar
           try { localStorage.setItem('cn_discount', JSON.stringify(currentDiscount)); } catch (e) {}
-          document.getElementById('descuento-aplicado') && (document.getElementById('descuento-aplicado').textContent = `Código válido: -${data.porcentaje_descuento}%`);
+          // mostrar monto descontado junto al porcentaje
+          try {
+            const cart = getCart();
+            const subtotal = cart.reduce((s,i) => s + (Number(i.precio) * Number(i.cantidad || 0)), 0);
+            const monto = subtotal * (Number(data.porcentaje_descuento) / 100);
+            const disp = document.getElementById('descuento-aplicado');
+            if (disp) disp.textContent = `- ${formatCurrency(monto)} (${data.porcentaje_descuento}%)`;
+          } catch (e) { document.getElementById('descuento-aplicado') && (document.getElementById('descuento-aplicado').textContent = `-${data.porcentaje_descuento}%`); }
           if (document.getElementById('fila-descuento')) document.getElementById('fila-descuento').style.display = '';
-          const quitarBtn = document.getElementById('quitar-descuento-btn'); if (quitarBtn) quitarBtn.style.display = '';
+          const quitarBtn = document.getElementById('quitar-descuento-btn'); if (quitarBtn) quitarBtn.style.display = 'none';
           // actualizar montos en carrito y checkout
           actualizarUIcarrito();
           if (document.getElementById('resumen-subtotal')) window.tienda.inicializarCheckout();
@@ -750,6 +757,14 @@
         const el = document.getElementById('login-error'); if (el) { el.textContent = data.message || 'Error autenticando'; el.style.display = 'block'; }
         return;
       }
+      // merge saved address if server didn't return it
+      try {
+        const saved = localStorage.getItem('cn_saved_address_' + (data.user && (data.user.email || data.user.username) ? (data.user.email || data.user.username) : ''));
+        if (saved && (!data.user.provincia && !data.user.direccion_exacta)) {
+          const addr = JSON.parse(saved);
+          data.user = Object.assign({}, data.user, addr || {});
+        }
+      } catch (e) { /* noop */ }
       localStorage.setItem('cn_token', data.token);
       localStorage.setItem('cn_user', JSON.stringify(data.user));
       updateAuthUI();
@@ -767,6 +782,10 @@
     const nombres = form.querySelector('input[name="nombres"]').value || '';
     const apellidos = form.querySelector('input[name="apellidos"]').value || '';
     const telefono = form.querySelector('input[name="telefono"]') ? form.querySelector('input[name="telefono"]').value || '' : '';
+    const provincia = form.querySelector('input[name="provincia"]') ? form.querySelector('input[name="provincia"]').value || '' : '';
+    const ciudad = form.querySelector('input[name="ciudad"]') ? form.querySelector('input[name="ciudad"]').value || '' : '';
+    const direccion = form.querySelector('input[name="direccion"]') ? form.querySelector('input[name="direccion"]').value || '' : '';
+    const guardarDireccion = form.querySelector('input[name="guardarDireccion"]') ? !!form.querySelector('input[name="guardarDireccion"]').checked : false;
     const password = form.querySelector('input[name="password"]').value;
     const confirm = form.querySelector('input[name="confirmPassword"]').value;
     if (password !== confirm) {
@@ -774,7 +793,9 @@
       return;
     }
     try {
-      const res = await fetch('/register', { method: 'POST', headers: { 'Content-Type':'application/json' }, body: JSON.stringify({ username: email, email, password, nombres, apellidos, telefono }) });
+      const body = { username: email, email, password, nombres, apellidos, telefono };
+      if (direccion || ciudad || provincia) { body.direccion = { provincia, ciudad, direccion }; body.saveAddress = guardarDireccion; }
+      const res = await fetch('/register', { method: 'POST', headers: { 'Content-Type':'application/json' }, body: JSON.stringify(body) });
       const data = await res.json();
       if (!res.ok) {
         const el = document.getElementById('register-error'); if (el) { el.textContent = data.message || 'Error registrando'; el.style.display = 'block'; }
@@ -801,6 +822,13 @@
         if (verifyModal) verifyModal.classList.add('active');
         if (inputToken) { inputToken.value = ''; setTimeout(()=>inputToken.focus(), 200); }
       } catch (err) { /* no bloquear por errores en UI */ }
+      // guardar dirección localmente para autocompletar al loguear si el usuario eligió guardar
+      try {
+        if (guardarDireccion && email) {
+          const addrObj = { provincia, ciudad, direccion_exacta: direccion };
+          localStorage.setItem('cn_saved_address_' + email, JSON.stringify(addrObj));
+        }
+      } catch (e) { console.warn('No se pudo guardar dirección localmente', e); }
     } catch (err) { console.error(err); document.getElementById('register-error').textContent = 'Error de red'; }
   }
 
@@ -887,6 +915,19 @@
       if (placeholder) placeholder.style.display = 'none';
       // inicializar resumen si estamos en checkout
       if (typeof window.tienda !== 'undefined' && window.tienda.inicializarCheckout) window.tienda.inicializarCheckout();
+      // completar campos del checkout con datos del usuario, si existen
+      try {
+        const userData = user || JSON.parse(localStorage.getItem('cn_user') || 'null');
+        if (userData) {
+          if (document.getElementById('nombres') && (userData.nombres || userData.firstName)) document.getElementById('nombres').value = userData.nombres || userData.firstName || '';
+          if (document.getElementById('apellidos') && (userData.apellidos || userData.lastName)) document.getElementById('apellidos').value = userData.apellidos || userData.lastName || '';
+          if (document.getElementById('email') && (userData.email || userData.username)) document.getElementById('email').value = userData.email || userData.username || '';
+          if (document.getElementById('telefono') && userData.telefono) document.getElementById('telefono').value = userData.telefono || '';
+          if (document.getElementById('provincia') && (userData.provincia || (userData.direccion && userData.direccion.provincia))) document.getElementById('provincia').value = userData.provincia || (userData.direccion && userData.direccion.provincia) || '';
+          if (document.getElementById('ciudad') && (userData.ciudad || (userData.direccion && userData.direccion.ciudad))) document.getElementById('ciudad').value = userData.ciudad || (userData.direccion && userData.direccion.ciudad) || '';
+          if (document.getElementById('direccion_exacta') && (userData.direccion_exacta || (userData.direccion && userData.direccion.direccion))) document.getElementById('direccion_exacta').value = userData.direccion_exacta || (userData.direccion && userData.direccion.direccion) || '';
+        }
+      } catch (e) { /* noop */ }
     } else {
       document.getElementById('auth-buttons') && (document.getElementById('auth-buttons').style.display = 'flex');
       document.getElementById('user-menu') && (document.getElementById('user-menu').style.display = 'none');
@@ -1020,10 +1061,18 @@
         const parsed = JSON.parse(stored);
         if (parsed && parsed.id && Number(parsed.porcentaje) > 0) {
           currentDiscount = parsed;
-          if (document.getElementById('descuento-aplicado')) {
-            document.getElementById('descuento-aplicado').textContent = `Código válido: -${currentDiscount.porcentaje}%`;
+          // mostrar monto descontado si hay items en carrito
+          try {
+            const cart = getCart();
+            const subtotal = cart.reduce((s,i) => s + (Number(i.precio) * Number(i.cantidad || 0)), 0);
+            const monto = subtotal * (Number(currentDiscount.porcentaje) / 100);
+            const disp = document.getElementById('descuento-aplicado');
+            if (disp) disp.textContent = `- ${formatCurrency(monto)} (${currentDiscount.porcentaje}%)`;
             document.getElementById('fila-descuento') && (document.getElementById('fila-descuento').style.display = '');
-            const quitarBtn = document.getElementById('quitar-descuento-btn'); if (quitarBtn) quitarBtn.style.display = '';
+            const quitarBtn = document.getElementById('quitar-descuento-btn'); if (quitarBtn) quitarBtn.style.display = 'none';
+          } catch (e) {
+            document.getElementById('descuento-aplicado') && (document.getElementById('descuento-aplicado').textContent = `-${currentDiscount.porcentaje}%`);
+            document.getElementById('fila-descuento') && (document.getElementById('fila-descuento').style.display = '');
           }
         } else { localStorage.removeItem('cn_discount'); currentDiscount = null; }
       }
