@@ -60,7 +60,8 @@
               <button class="btn-auth btn-register" onclick="aplicarDescuento()"
                 style="padding: 0.5rem 1rem;">Aplicar</button>
             </div>
-            <p id="descuento-aplicado" style="color: var(--success); margin-top: 0.3rem;"></p>
+              <p id="descuento-aplicado" style="color: var(--success); margin-top: 0.3rem; display:inline-block;"></p>
+              <button id="quitar-descuento-btn" onclick="quitarDescuento()" style="display:none; margin-left:0.5rem; background:transparent; border:1px solid var(--success); color:var(--success); padding:0.2rem 0.5rem; border-radius:4px;">Quitar</button>
           </div>
         </div>
 
@@ -72,9 +73,9 @@
         </div>
 
         <div style="text-align: right;">
-          <a href="/tienda/" class="btn-continuar-comprando"
-            style="display: inline-block; background: var(--primary);">Seguir Comprando</a>
-          <button class="btn-proceder-pago" onclick="procederAlPago()">Proceder al Pago</button>
+          <a href="/tienda/" class="btn-continuar-comprando" style="display: inline-block; background: var(--primary);">Seguir Comprando</a>
+          <button class="btn-vaciar" onclick="vaciarCarrito()" style="margin-left:0.6rem; background: #e74c3c; color: white; border: none; padding: 0.6rem 1rem; border-radius:4px; cursor:pointer;">Vaciar Carrito</button>
+          <button class="btn-proceder-pago" onclick="procederAlPago()" style="margin-left:0.6rem;">Proceder al Pago</button>
         </div>
       </div>
     </div>
@@ -138,6 +139,17 @@
         <div class="success-message" id="register-success"></div>
         <button type="submit" class="btn-submit">Crear Cuenta</button>
       </form>
+    </div>
+  </div>
+
+  <!-- Modal de confirmación reutilizable -->
+  <div class="modal" id="confirm-modal">
+    <div class="modal-content">
+      <div id="confirm-message" style="margin-bottom:1rem; font-weight:600;"></div>
+      <div style="display:flex; gap:0.5rem; justify-content:flex-end;">
+        <button id="confirm-cancel" class="btn-submit" style="background:#6c757d;">Cancelar</button>
+        <button id="confirm-ok" class="btn-submit" style="background:#e74c3c;">Confirmar</button>
+      </div>
     </div>
   </div>
 

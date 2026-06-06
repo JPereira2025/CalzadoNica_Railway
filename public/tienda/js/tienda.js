@@ -21,6 +21,19 @@
   function getCart() {
     try { return JSON.parse(localStorage.getItem(CART_KEY)) || []; } catch { return []; }
   }
+  // Quitar descuento aplicado
+  function quitarDescuento() {
+    try {
+      currentDiscount = null;
+      localStorage.removeItem('cn_discount');
+      const montoEl = document.getElementById('monto-descuento'); if (montoEl) montoEl.textContent = '';
+      const aplicado = document.getElementById('descuento-aplicado'); if (aplicado) aplicado.textContent = '';
+      const fila = document.getElementById('fila-descuento'); if (fila) fila.style.display = 'none';
+      const quitarBtn = document.getElementById('quitar-descuento-btn'); if (quitarBtn) quitarBtn.style.display = 'none';
+      actualizarUIcarrito();
+      showToast('Descuento removido', 'success');
+    } catch (e) { console.error('quitarDescuento error', e); showToast('Error removiendo descuento', 'error'); }
+  }
 
   /**
    * Persistencia del carrito
@@ -173,6 +186,20 @@
       document.getElementById('producto-precio').textContent = formatCurrency(p.precio);
       document.getElementById('producto-stock').textContent = p.stock > 0 ? 'En stock' : 'Agotado';
       document.getElementById('img-principal').src = p.imagen_principal || '/tienda/img/sin-imagen.svg';
+      // rellenar selector de talla si existe
+      try {
+        const tallaSel = document.getElementById('talla');
+        if (tallaSel) {
+          tallaSel.innerHTML = '<option value="">Selecciona talla</option>';
+          // si la API devuelve array de tallas usarlo, sino usar p.talla como única opción
+          const tallas = Array.isArray(p.tallas) && p.tallas.length ? p.tallas : (p.talla ? [p.talla] : []);
+          tallas.forEach(t => {
+            const opt = document.createElement('option'); opt.value = t; opt.textContent = t; tallaSel.appendChild(opt);
+          });
+          // seleccionar la talla por defecto si existe
+          if (p.talla) tallaSel.value = String(p.talla);
+        }
+      } catch (e) { /* noop */ }
       // preparar carrusel
       currentImages = [];
       currentImageIndex = 0;
@@ -365,10 +392,12 @@
   function agregarAlCarrito() {
     if (!currentProduct) return alert('Producto no cargado');
     const cantidad = Number(document.getElementById('cantidad')?.value || 1);
+    const selectedTalla = document.getElementById('talla') ? (document.getElementById('talla').value || null) : (currentProduct.talla || null);
     const cart = getCart();
-    const found = cart.find(it => it.id === currentProduct.id);
+    // try to find same product + same talla to aggregate quantities
+    const found = cart.find(it => it.id === currentProduct.id && (it.talla || null) === (selectedTalla || null));
     if (found) found.cantidad = Math.min((found.cantidad || 0) + cantidad, 999);
-    else cart.push({ id: currentProduct.id, nombre: `${currentProduct.marca} ${currentProduct.modelo}`, precio: Number(currentProduct.precio), cantidad, imagen: currentProduct.imagen_principal || '/tienda/img/sin-imagen.svg' });
+    else cart.push({ id: currentProduct.id, nombre: `${currentProduct.marca} ${currentProduct.modelo}`, precio: Number(currentProduct.precio), cantidad, imagen: currentProduct.imagen_principal || '/tienda/img/sin-imagen.svg', talla: selectedTalla });
     saveCart(cart);
     actualizarCartCount();
     showToast('Producto agregado al carrito', 'success');
@@ -407,6 +436,7 @@
         <div class="carrito-item-info">
           <h3>${item.nombre}</h3>
           <p>Precio: ${formatCurrency(item.precio)}</p>
+          <p>Talla: ${item.talla ? item.talla : '—'}</p>
         </div>
         <div class="carrito-item-cantidad">
           <button onclick="(function(){ window.tienda.cambiarCantidad('${item.id}', -1); })()">-</button>
@@ -429,7 +459,9 @@
     }
     const total = Math.max(0, subtotal - descuentoMonto);
     document.getElementById('total').textContent = formatCurrency(total);
-    document.getElementById('carrito-cantidad').textContent = `${cart.length} artículos`;
+    // mostrar cantidad total de artículos (sum de cantidades)
+    const totalQty = cart.reduce((s,i) => s + Number(i.cantidad || 0), 0);
+    document.getElementById('carrito-cantidad').textContent = `${totalQty} artículo${totalQty !== 1 ? 's' : ''}`;
     actualizarCartCount();
   }
 
@@ -450,6 +482,87 @@
     showToast('Producto removido', 'success');
   }
 
+  // Mostrar modal de confirmación reutilizable. Retorna Promise<boolean>
+  function showConfirm(message) {
+    return new Promise((resolve) => {
+      const modal = document.getElementById('confirm-modal');
+      if (!modal) return resolve(window.confirm(message));
+      const msgEl = document.getElementById('confirm-message');
+      const okBtn = document.getElementById('confirm-ok');
+      const cancelBtn = document.getElementById('confirm-cancel');
+      let cleanup = () => {
+        modal.classList.remove('active');
+        okBtn.removeEventListener('click', onOk);
+        cancelBtn.removeEventListener('click', onCancel);
+        modal.removeEventListener('click', onOverlay);
+      };
+      function onOk(ev) { ev && ev.stopPropagation(); cleanup(); resolve(true); }
+      function onCancel(ev) { ev && ev.stopPropagation(); cleanup(); resolve(false); }
+      function onOverlay(e) { if (e.target === modal) { cleanup(); resolve(false); } }
+      if (msgEl) msgEl.textContent = message || '';
+      okBtn.addEventListener('click', onOk);
+      cancelBtn.addEventListener('click', onCancel);
+      modal.addEventListener('click', onOverlay);
+      // show
+      modal.classList.add('active');
+    });
+  }
+
+  // Mostrar toast con botón Deshacer. undoCb se ejecuta si el usuario presiona Deshacer.
+  function showUndoToast(message, undoCb, timeout = 6000) {
+    try {
+      const t = document.createElement('div');
+      t.className = 'toast success';
+      t.style.display = 'flex';
+      t.style.alignItems = 'center';
+      t.style.gap = '0.6rem';
+      t.style.padding = '0.6rem 0.9rem';
+      const span = document.createElement('span'); span.textContent = message;
+      const btn = document.createElement('button');
+      btn.textContent = 'Deshacer';
+      btn.style.background = 'transparent';
+      btn.style.color = 'white';
+      btn.style.border = '1px solid rgba(255,255,255,0.2)';
+      btn.style.padding = '0.25rem 0.6rem';
+      btn.style.borderRadius = '4px';
+      btn.style.cursor = 'pointer';
+      let removed = false;
+      const timer = setTimeout(() => { if (!removed) { try { t.remove(); } catch (e) {} } }, timeout);
+      btn.onclick = () => {
+        if (removed) return; removed = true; clearTimeout(timer); try { undoCb && undoCb(); } catch (e) { console.error(e); }
+        try { t.remove(); } catch (e) {}
+      };
+      t.appendChild(span); t.appendChild(btn); document.body.appendChild(t);
+    } catch (e) { console.error('showUndoToast error', e); }
+  }
+
+  // Vaciar carrito con confirmación modal y opción de deshacer
+  async function vaciarCarrito() {
+    try {
+      const ok = await showConfirm('¿Estás seguro de que deseas vaciar el carrito?');
+      if (!ok) return;
+      const prev = getCart();
+      // persistir backup temporal por si el usuario navega
+      try { localStorage.setItem('cn_cart_backup', JSON.stringify(prev)); } catch (e) {}
+      saveCart([]);
+      actualizarUIcarrito();
+      showUndoToast('Carrito vaciado', () => {
+        try {
+          const backup = JSON.parse(localStorage.getItem('cn_cart_backup') || 'null');
+          if (backup && Array.isArray(backup)) {
+            saveCart(backup);
+            actualizarUIcarrito();
+            showToast('Carrito restaurado', 'success');
+            localStorage.removeItem('cn_cart_backup');
+          }
+        } catch (e) { console.error('Error restaurando carrito', e); showToast('No se pudo restaurar el carrito', 'error'); }
+      }, 8000);
+    } catch (e) {
+      console.error('Error vaciando carrito', e);
+      showToast('No se pudo vaciar el carrito', 'error');
+    }
+  }
+
   function procederAlPago() {
     const cart = getCart();
     if (!cart.length) return alert('El carrito está vacío');
@@ -468,6 +581,7 @@
           try { localStorage.setItem('cn_discount', JSON.stringify(currentDiscount)); } catch (e) {}
           document.getElementById('descuento-aplicado') && (document.getElementById('descuento-aplicado').textContent = `Código válido: -${data.porcentaje_descuento}%`);
           if (document.getElementById('fila-descuento')) document.getElementById('fila-descuento').style.display = '';
+          const quitarBtn = document.getElementById('quitar-descuento-btn'); if (quitarBtn) quitarBtn.style.display = '';
           // actualizar montos en carrito y checkout
           actualizarUIcarrito();
           if (document.getElementById('resumen-subtotal')) window.tienda.inicializarCheckout();
@@ -486,6 +600,15 @@
     if (e) e.preventDefault();
     const cart = getCart();
     if (!cart.length) return alert('Carrito vacío');
+    // Requerir que el usuario esté autenticado
+    const user = JSON.parse(localStorage.getItem('cn_user') || 'null');
+    const token = localStorage.getItem('cn_token');
+    if (!user || !token) {
+      // abrir modal de login y mostrar advertencia
+      showToast('Debe iniciar sesión antes de proceder al pago', 'error');
+      abrirModal('login');
+      return;
+    }
     const nombres = document.getElementById('nombres').value;
     const apellidos = document.getElementById('apellidos').value;
     const email = document.getElementById('email').value;
@@ -494,41 +617,86 @@
     const ciudad = document.getElementById('ciudad').value;
     const direccion_exacta = document.getElementById('direccion_exacta').value;
     const metodo_pago = document.getElementById('metodo_pago').value;
+    // recoger detalles de pago según método
+    let pago_detalles = null;
+    if (metodo_pago === 'transferencia') {
+      const num = document.getElementById('transfer_numero')?.value?.trim();
+      const nombre = document.getElementById('transfer_nombre')?.value?.trim();
+      const banco = document.getElementById('transfer_banco')?.value?.trim();
+      if (!num || !nombre || !banco) {
+        document.getElementById('checkout-error').textContent = 'Complete los datos de la transferencia bancaria';
+        document.getElementById('checkout-error').style.display = '';
+        if (document.getElementById('transferencia-section')) document.getElementById('transferencia-section').scrollIntoView({behavior:'smooth'});
+        return;
+      }
+      pago_detalles = { tipo: 'transferencia', numero: num, titular: nombre, banco };
+    } else if (metodo_pago === 'pago_movil') {
+      const num = document.getElementById('billetera_numero')?.value?.trim();
+      const codigo = document.getElementById('billetera_codigo')?.value?.trim();
+      const nombre = document.getElementById('billetera_nombre')?.value?.trim();
+      if (!num || !codigo || !nombre) {
+        document.getElementById('checkout-error').textContent = 'Complete los datos de la billetera móvil';
+        document.getElementById('checkout-error').style.display = '';
+        if (document.getElementById('billetera-section')) document.getElementById('billetera-section').scrollIntoView({behavior:'smooth'});
+        return;
+      }
+      pago_detalles = { tipo: 'billetera_movil', numero: num, codigo: codigo, titular: nombre };
+    }
     if (!nombres || !apellidos || !email || !telefono || !provincia || !ciudad || !direccion_exacta || !metodo_pago) {
       document.getElementById('checkout-error').textContent = 'Complete todos los campos requeridos';
       document.getElementById('checkout-error').style.display = '';
       return;
     }
 
-    const items = cart.map(i => ({ id: i.id, nombre: i.nombre, cantidad: i.cantidad, precio: i.precio }));
+    const items = cart.map(i => ({ id: i.id, nombre: i.nombre, cantidad: i.cantidad, precio: i.precio, talla: i.talla || null }));
     const subtotal = cart.reduce((s,i) => s + (i.precio * i.cantidad), 0);
     const descuentoMonto = currentDiscount ? (subtotal * (currentDiscount.porcentaje / 100)) : 0;
     const base = subtotal - descuentoMonto;
     const iva = Number((base * IVA_RATE).toFixed(2));
     const total = Number((base + iva).toFixed(2));
+    // No generar ID de factura en cliente; el servidor debe asignarla para garantizar consistencia
     const payload = {
-      id: `F-${Date.now()}`,
       cliente: `${nombres} ${apellidos} <${email}>`,
       vendedor: 'web',
-      items: items.map(it => ({ id: it.id, nombre: it.nombre, cantidad: it.cantidad, precio: it.precio })),
+      items: items.map(it => ({ id: it.id, nombre: it.nombre, cantidad: it.cantidad, precio: it.precio, talla: it.talla })),
       subtotal,
       monto_descuento: Number(descuentoMonto.toFixed(2)),
       iva,
       total,
-      codigo_descuento: currentDiscount ? currentDiscount.id : null
+      codigo_descuento: currentDiscount ? currentDiscount.id : null,
+      metodo_pago,
+      pago_detalles
     };
 
     const btn = document.getElementById('btn-confirmar');
     if (btn) { btn.disabled = true; btn.textContent = 'Procesando...'; }
     try {
-      const res = await fetch('/api/facturas', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+      // si hay comprobante de pago (archivo), enviar como FormData para incluir archivo
+      let res;
+      const token = localStorage.getItem('cn_token');
+      let fileInput = null;
+      if (metodo_pago === 'transferencia') fileInput = document.getElementById('transfer_comprobante');
+      if (metodo_pago === 'pago_movil') fileInput = document.getElementById('billetera_comprobante');
+      if (fileInput && fileInput.files && fileInput.files.length) {
+        const fd = new FormData();
+        fd.append('comprobante', fileInput.files[0]);
+        fd.append('payload', JSON.stringify(payload));
+        const headers = token ? { 'Authorization': 'Bearer ' + token } : {};
+        res = await fetch('/api/facturas', { method: 'POST', headers, body: fd });
+      } else {
+        const headers = { 'Content-Type': 'application/json' };
+        if (token) headers['Authorization'] = 'Bearer ' + token;
+        res = await fetch('/api/facturas', { method: 'POST', headers, body: JSON.stringify(payload) });
+      }
       const data = await res.json();
       if (!res.ok || !data.success) {
         throw new Error(data.message || 'Error registrando pedido');
       }
+      // usar el ID devuelto por el servidor (ej: FACT003-260605-2309)
+      const facturaId = data.id || data.facturaId || data.numero || null;
       localStorage.removeItem(CART_KEY);
       actualizarCartCount();
-      mostrarConfirmacion(data.id);
+      mostrarConfirmacion(facturaId || 'Pedido registrado');
       currentDiscount = null;
     } catch (err) {
       console.error(err);
@@ -712,10 +880,22 @@
       document.getElementById('auth-buttons') && (document.getElementById('auth-buttons').style.display = 'none');
       document.getElementById('user-menu') && (document.getElementById('user-menu').style.display = 'flex');
       document.getElementById('user-name') && (document.getElementById('user-name').textContent = user.username);
+      // si estamos en checkout, mostrar el formulario
+      const form = document.getElementById('checkout-form');
+      const placeholder = document.getElementById('login-required');
+      if (form) form.style.display = '';
+      if (placeholder) placeholder.style.display = 'none';
+      // inicializar resumen si estamos en checkout
+      if (typeof window.tienda !== 'undefined' && window.tienda.inicializarCheckout) window.tienda.inicializarCheckout();
     } else {
       document.getElementById('auth-buttons') && (document.getElementById('auth-buttons').style.display = 'flex');
       document.getElementById('user-menu') && (document.getElementById('user-menu').style.display = 'none');
       document.getElementById('user-name') && (document.getElementById('user-name').textContent = '');
+      // si estamos en checkout, ocultar el formulario
+      const form2 = document.getElementById('checkout-form');
+      const placeholder2 = document.getElementById('login-required');
+      if (form2) form2.style.display = 'none';
+      if (placeholder2) placeholder2.style.display = '';
     }
   }
 
@@ -739,7 +919,8 @@
         row.className = 'resumen-item';
         const itemSubtotal = Number(it.precio) * Number(it.cantidad);
         subtotal += itemSubtotal;
-        row.innerHTML = `<span>${it.nombre} x ${it.cantidad}</span><span>${formatCurrency(itemSubtotal)}</span>`;
+        const tallaText = it.talla ? ` (Talla: ${it.talla})` : '';
+        row.innerHTML = `<span>${it.nombre}${tallaText} x ${it.cantidad}</span><span>${formatCurrency(itemSubtotal)}</span>`;
         resumenItems && resumenItems.appendChild(row);
       });
       const descuentoMonto = currentDiscount ? (subtotal * (currentDiscount.porcentaje / 100)) : 0;
@@ -771,6 +952,8 @@
     },
     cambiarCantidad,
     eliminarItem,
+    vaciarCarrito,
+    quitarDescuento,
     abrirModal,
     cerrarModal,
     cambiarTab,
@@ -820,9 +1003,13 @@
   window.resendTokenStore = resendTokenStore;
   // Exponer aplicarDescuento para botones inline (ej. carrito)
   window.aplicarDescuento = function() { return window.tienda.aplicarDescuento(); };
+  // Exponer quitarDescuento
+  window.quitarDescuento = function() { return window.tienda.quitarDescuento && window.tienda.quitarDescuento(); };
   // Exponer inicializarCheckout y procesarPedido para checkout.html
   window.inicializarCheckout = function() { return window.tienda.inicializarCheckout && window.tienda.inicializarCheckout(); };
   window.procesarPedido = function(e) { return typeof procesarPedido === 'function' ? procesarPedido(e) : null; };
+  // Exponer vaciarCarrito para uso en HTML
+  window.vaciarCarrito = function() { return window.tienda.vaciarCarrito && window.tienda.vaciarCarrito(); };
 
   // Auto-init según página
   document.addEventListener('DOMContentLoaded', () => {
@@ -830,11 +1017,15 @@
     try {
       const stored = localStorage.getItem('cn_discount');
       if (stored) {
-        currentDiscount = JSON.parse(stored);
-        if (currentDiscount && document.getElementById('descuento-aplicado')) {
-          document.getElementById('descuento-aplicado').textContent = `Código válido: -${currentDiscount.porcentaje}%`;
-          document.getElementById('fila-descuento') && (document.getElementById('fila-descuento').style.display = '');
-        }
+        const parsed = JSON.parse(stored);
+        if (parsed && parsed.id && Number(parsed.porcentaje) > 0) {
+          currentDiscount = parsed;
+          if (document.getElementById('descuento-aplicado')) {
+            document.getElementById('descuento-aplicado').textContent = `Código válido: -${currentDiscount.porcentaje}%`;
+            document.getElementById('fila-descuento') && (document.getElementById('fila-descuento').style.display = '');
+            const quitarBtn = document.getElementById('quitar-descuento-btn'); if (quitarBtn) quitarBtn.style.display = '';
+          }
+        } else { localStorage.removeItem('cn_discount'); currentDiscount = null; }
       }
     } catch (e) { console.warn('No se pudo restaurar descuento', e); }
     if (document.getElementById('productos-grid')) {
@@ -852,7 +1043,33 @@
       if (id) cargarDetalleProducto(id);
     }
     if (document.getElementById('checkout-form')) {
-      window.tienda.inicializarCheckout();
+      const user = JSON.parse(localStorage.getItem('cn_user') || 'null');
+      const token = localStorage.getItem('cn_token');
+      const form = document.getElementById('checkout-form');
+      const placeholder = document.getElementById('login-required');
+      if (!user || !token) {
+        if (form) form.style.display = 'none';
+        if (placeholder) placeholder.style.display = '';
+        abrirModal('login');
+      } else {
+        if (form) form.style.display = '';
+        if (placeholder) placeholder.style.display = 'none';
+        window.tienda.inicializarCheckout();
+      }
+    }
+    // bind metodo_pago change to show payment detail sections
+    const metodoEl = document.getElementById('metodo_pago');
+    if (metodoEl) {
+      function togglePaymentSections() {
+        const val = metodoEl.value;
+        const trans = document.getElementById('transferencia-section');
+        const bille = document.getElementById('billetera-section');
+        if (trans) trans.style.display = val === 'transferencia' ? '' : 'none';
+        if (bille) bille.style.display = val === 'pago_movil' ? '' : 'none';
+      }
+      metodoEl.addEventListener('change', togglePaymentSections);
+      // initial
+      togglePaymentSections();
     }
     updateAuthUI();
   });

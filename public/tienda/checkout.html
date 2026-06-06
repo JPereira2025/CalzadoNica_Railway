@@ -35,6 +35,10 @@
   <main class="container">
     <a href="/tienda/carrito.html" class="btn-volver">&larr; Volver al carrito</a>
 
+    <div id="login-required" style="display:none; background:#fff3cd; border:1px solid #ffeeba; padding:1rem; margin:1rem 0; border-radius:6px;">
+      Debes iniciar sesión para completar el pago. <button onclick="abrirModal('login')" style="margin-left:0.5rem; padding:0.3rem 0.6rem; background:#0d6efd; color:white; border:none; border-radius:4px;">Iniciar sesión</button>
+    </div>
+
     <h1 style="margin-bottom: 2rem;">Finalizar Pedido</h1>
 
     <div class="checkout-container">
@@ -94,7 +98,7 @@
             <select name="metodo_pago" id="metodo_pago" required>
               <option value="">Seleccione un método de pago</option>
               <option value="transferencia">Transferencia Bancaria</option>
-              <option value="pago_movil">Pago Móvil</option>
+              <option value="pago_movil">Billetera Móvil</option>
               <option value="efectivo">Pago en Efectivo (contra entrega)</option>
             </select>
           </div>
@@ -103,6 +107,49 @@
             <label>Notas del pedido (opcional)</label>
             <textarea name="notas" id="notas"
               placeholder="Instrucciones especiales, preferencias de entrega, etc."></textarea>
+          </div>
+
+          <!-- Detalles para métodos de pago específicos -->
+          <div id="payment-details">
+            <div id="transferencia-section" style="display:none; margin-top:1rem;">
+              <h3>Detalles de Transferencia</h3>
+              <div class="form-group">
+                <label>Número de transferencia</label>
+                <input type="text" id="transfer_numero" placeholder="Ej: 123456789">
+              </div>
+              <div class="form-group">
+                <label>A nombre de (titular)</label>
+                <input type="text" id="transfer_nombre" placeholder="Nombre del titular">
+              </div>
+              <div class="form-group">
+                <label>Banco</label>
+                <input type="text" id="transfer_banco" placeholder="Nombre del banco">
+              </div>
+              <div class="form-group">
+                <label>Comprobante (imagen, opcional)</label>
+                <input type="file" id="transfer_comprobante" accept="image/*">
+              </div>
+            </div>
+
+            <div id="billetera-section" style="display:none; margin-top:1rem;">
+              <h3>Detalles de Billetera Móvil</h3>
+              <div class="form-group">
+                <label>Número de billetera</label>
+                <input type="text" id="billetera_numero" placeholder="Número de teléfono o cuenta">
+              </div>
+              <div class="form-group">
+                <label>Código de transacción</label>
+                <input type="text" id="billetera_codigo" placeholder="Código/ID de la transacción">
+              </div>
+              <div class="form-group">
+                <label>A nombre de (titular)</label>
+                <input type="text" id="billetera_nombre" placeholder="Nombre del titular">
+              </div>
+              <div class="form-group">
+                <label>Comprobante (imagen, opcional)</label>
+                <input type="file" id="billetera_comprobante" accept="image/*">
+              </div>
+            </div>
           </div>
 
           <div class="error-message" id="checkout-error" style="margin-bottom: 1rem;"></div>

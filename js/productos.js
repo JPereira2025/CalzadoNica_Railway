@@ -68,7 +68,12 @@ function openProductoModal(id = null) {
                 if (prod) {
                     $('#producto-marca').val(prod.marca);
                     $('#producto-modelo').val(prod.modelo);
-                    $('#producto-talla').val(prod.talla);
+                    // soportar tallas como array o string
+                    if (Array.isArray(prod.tallas) && prod.tallas.length) {
+                        $('#producto-talla').val(prod.tallas.join(','));
+                    } else {
+                        $('#producto-talla').val(prod.talla || '');
+                    }
                     $('#producto-color').val(prod.color);
                     $('#producto-precio').val(prod.precio);
                     $('#producto-stock').val(prod.stock);
@@ -96,7 +101,9 @@ function handleProductoSubmit(e) {
     const payload = {
         marca: $('#producto-marca').val(),
         modelo: $('#producto-modelo').val(),
+        // aceptar múltiples tallas separadas por comas
         talla: $('#producto-talla').val(),
+        tallas: ($('#producto-talla').val() || '').split(',').map(s => s.trim()).filter(Boolean),
         color: $('#producto-color').val(),
         precio: parseFloat($('#producto-precio').val()) || 0,
         stock: parseInt($('#producto-stock').val()) || 0,
