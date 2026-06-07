@@ -1,0 +1,49 @@
+name: Build and Deploy (Railway)
+
+on:
+  push:
+    branches: [ main, master, version-6 ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Cache node modules
+        uses: actions/cache@v4
+        with:
+          path: ~/.npm
+          key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-node-
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build CSS
+        run: npm run build:css || true
+
+      - name: Prisma generate
+        run: npx prisma generate || true
+
+      - name: Run tests (none)
+        run: echo "No test suite configured"
+
+      - name: Deploy to Railway (optional)
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_API_KEY }}
+          RAILWAY_PROJECT_ID: ${{ secrets.RAILWAY_PROJECT_ID }}
+        run: |
+          if [ -z "$RAILWAY_TOKEN" ] || [ -z "$RAILWAY_PROJECT_ID" ]; then
+            echo "Railway credentials not set; skipping deploy"
+            exit 0
+          fi
+          echo "Deploying to Railway project $RAILWAY_PROJECT_ID"
+          npx @railway/cli up --project $RAILWAY_PROJECT_ID --detach

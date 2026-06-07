@@ -166,3 +166,25 @@ $resp = curl -s -X POST http://localhost:3001/login -H "Content-Type: applicatio
 $token = ($resp | ConvertFrom-Json).token
 Write-Host "TOKEN:" $token
   
+
+---
+
+## Despliegue en Railway (opcional)
+
+Este repositorio incluye un workflow de GitHub Actions (`.github/workflows/deploy-railway.yml`) que construye el proyecto y, si configuras las credenciales, intenta desplegar en Railway.
+
+Pasos recomendados:
+
+1. Crea un proyecto nuevo en Railway y añade una base de datos (Postgres o MySQL según prefieras).
+2. Copia la `DATABASE_URL` que Railway te proporciona y pégala en las variables de entorno del proyecto en Railway.
+3. En la configuración del repositorio en GitHub, añade los siguientes secretos en `Settings -> Secrets`:
+	- `RAILWAY_API_KEY` — tu API key/token de Railway.
+	- `RAILWAY_PROJECT_ID` — el ID del proyecto Railway (lo verás en la URL o en la configuración del proyecto).
+4. Opcional: añade las variables de entorno necesarias en Railway (por ejemplo `JWT_SECRET`, `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_USER`, `EMAIL_PASS`).
+5. Al hacer push a `main`, `master` o `version-6`, el workflow ejecutará la compilación; si detecta los secretos, ejecutará `npx @railway/cli up` para desplegar.
+
+Notas de seguridad:
+
+- Nunca subas tu `.env` al repositorio. Usa `.env.example` para documentar variables.
+- Guarda tus secretos en GitHub Secrets y en Railway variables.
+
