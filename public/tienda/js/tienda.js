@@ -1,6 +1,5 @@
 /**
  * MÓDULO: Tienda Virtual
- * @author Gemini Code Assist
  * @description Lógica del lado del cliente para la tienda de Calzado Nica.
  * Maneja:
  * - Listado dinámico de productos y filtros.
@@ -226,7 +225,7 @@
                     b.type = 'button';
                     b.className = 'mini-thumb';
                     b.innerHTML = `<img src="${img.url}" alt="thumb" class="mini-thumb-img" data-idx="${idx}" data-imgid="${img.id}" />`;
-                    b.onclick = () => { setCurrentImage(idx); };
+                    b.onclick = (ev) => { setCurrentImage(idx); openLightbox(idx); };
                     wrapper.appendChild(b);
                     if (isAdmin) {
                       const markBtn = document.createElement('button');
@@ -245,10 +244,10 @@
                   initMiniaturasCarousel(miniCont);
             // set main image
             setCurrentImage(currentImageIndex);
-            // asignar doble click para abrir lightbox
+            // asignar click para abrir lightbox (UX: click abre imagen en grande)
             const mainImg = document.getElementById('img-principal');
             if (mainImg) {
-              mainImg.ondblclick = () => openLightbox(currentImageIndex);
+              mainImg.onclick = () => openLightbox(currentImageIndex);
             }
             ensureCarouselControls();
           } else {

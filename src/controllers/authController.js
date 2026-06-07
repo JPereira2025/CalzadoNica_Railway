@@ -1,6 +1,5 @@
 /**
  * CONTROLADOR: AuthController
- * @author Gemini Code Assist
  * @description Maneja el ciclo de vida de la autenticación:
  * 1. Login multi-tabla (Usuarios y Clientes).
  * 2. Registro segmentado por roles.
