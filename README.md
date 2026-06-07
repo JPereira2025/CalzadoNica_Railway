@@ -28,12 +28,28 @@ npm install
 ```
 
 ### 3. Variables de Entorno
-Cree un archivo `.env` en la raíz con el siguiente contenido:
+Use `.env.example` como plantilla. Copie el archivo y cree su `.env` localmente (no subir `.env` al repositorio):
+
+```bash
+cp .env.example .env
+# editar .env y completar valores secretos
+```
+
+Variables clave (ejemplos):
+
 ```env
 JWT_SECRET=tu_secreto_super_seguro
 PORT=3001
 HOST=0.0.0.0
+DATABASE_URL="mysql://root:password@127.0.0.1:3306/calzado_nica"
+EMAIL_HOST=smtp.example.com
+EMAIL_PORT=587
+EMAIL_USER=you@example.com
+EMAIL_PASS=your_email_password
+EMAIL_FROM=no-reply@example.com
 ```
+
+Importante: nunca subas el archivo `.env` con credenciales. Usa `.env.example` para documentar las variables requeridas.
 
 ### 4. Ejecución
 

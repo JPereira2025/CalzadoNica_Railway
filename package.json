@@ -7,7 +7,11 @@
     "watch:css": "nodemon --watch src/css --exec \"node build-tailwind.js\"",
     "start:api": "node src/server.js",
     "predev:api": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/free_port_windows.ps1 3001",
-    "dev:api": "nodemon --watch src --exec \"node src/server.js\""
+    "dev:api": "nodemon --watch src --exec \"node src/server.js\"",
+    "prisma:push": "npx prisma db push",
+    "prisma:generate": "npx prisma generate",
+    "prisma:migrate:deploy": "npx prisma migrate deploy",
+    "deploy:railway": "echo 'Use Railway UI or CLI to deploy; set environment variables in Railway'"
   },
   "dependencies": {
     "@prisma/client": "^4.16.2",
