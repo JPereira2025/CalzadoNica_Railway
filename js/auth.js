@@ -169,7 +169,13 @@ function handleLogin(e) {
                 $("#loginError").removeClass("hidden").text(response.message || 'Usuario o contraseña incorrectos. Inténtelo nuevamente.');
             }
         })
-        .fail(() => showNotification('Error de conexión. Revisa la consola (F12).', 'error'))
+        .fail((xhr) => {
+            if (xhr && xhr.responseJSON && xhr.responseJSON.message) {
+                $('#loginError').removeClass('hidden').text(xhr.responseJSON.message);
+            } else {
+                showNotification('Error de conexión. Revisa la consola (F12).', 'error');
+            }
+        })
         .always(() => $submitBtn.prop('disabled', false).text('Iniciar Sesión'));
 }
 
@@ -267,7 +273,13 @@ function handleVerify(e) {
                 $("#verifyError").removeClass('hidden').text(res.message || 'Token inválido');
             }
         })
-        .fail(() => { $("#verifyError").removeClass('hidden').text('Error de conexión'); })
+        .fail((xhr) => {
+            if (xhr && xhr.responseJSON && xhr.responseJSON.message) {
+                $("#verifyError").removeClass('hidden').text(xhr.responseJSON.message);
+            } else {
+                $("#verifyError").removeClass('hidden').text('Error de conexión');
+            }
+        })
         .always(() => $btn.prop('disabled', false).text('Verificar'));
 }
 
@@ -279,3 +291,37 @@ $(document).on('submit', '#registerForm', handleRegister);
 $(document).on('click', '#showVerifyLink', showVerify);
 $(document).on('click', '#cancelVerify', function(){ hideVerify(); });
 $(document).on('submit', '#verifyForm', handleVerify);
+
+// Reenviar token desde el modal de verificación (usuarios que no han iniciado sesión)
+$(document).on('click', '#btnResendVerify', function(e) {
+    e.preventDefault();
+    const usernameOrEmail = $('#verify-usernameOrEmail').val().trim();
+    if (!usernameOrEmail) {
+        $('#verifyError').removeClass('hidden').text('Ingresa tu usuario o correo para reenviar el token');
+        return;
+    }
+    $('#verifyError').addClass('hidden');
+    const $btn = $(this);
+    const prevHtml = $btn.html();
+    $btn.prop('disabled', true).text('Enviando...');
+    apiCall('/resend-token', 'POST', { usernameOrEmail })
+        .done(res => {
+            // Si el servidor devuelve el token en modo debug, rellenarlo en el input
+            if (res && res.token) {
+                $('#verify-token').val(res.token);
+                $('#verifyError').addClass('hidden');
+                showNotification('Token reenviado (debug). Se ha rellenado el campo.', 'info');
+                // enfocar el campo token para que el usuario pueda verificar rápidamente
+                $('#verify-token').focus();
+            } else {
+                showNotification(res.message || 'Token reenviado. Revisa tu correo.', 'success');
+            }
+        })
+        .fail((xhr) => {
+            const msg = (xhr && xhr.responseJSON && xhr.responseJSON.message) || 'Error reenviando token';
+            $('#verifyError').removeClass('hidden').text(msg);
+        })
+        .always(() => {
+            $btn.prop('disabled', false).html(prevHtml);
+        });
+});

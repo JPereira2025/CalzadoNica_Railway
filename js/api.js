@@ -67,10 +67,19 @@ function apiCall(endpoint, method = 'GET', data = null) {
         const timestamp = new Date().toISOString();
         console.error(`[${timestamp}] [API_FAILURE] Path: ${endpoint} | Status: ${xhr.status} | Error: ${error}`);
         
+        // Preferir el mensaje de error provisto por el servidor si está disponible
         let errorMessage = `Error al comunicarse con el servidor: ${status}`;
-        if (error === 'parsererror') {
-            errorMessage = 'Error: La respuesta del servidor no es un JSON válido. Revisa la consola (F12) para ver los detalles del error en PHP.';
+        try {
+            const body = xhr.responseJSON || (xhr.responseText ? JSON.parse(xhr.responseText) : null);
+            if (body && body.message) {
+                errorMessage = body.message;
+            } else if (error === 'parsererror') {
+                errorMessage = 'Error: La respuesta del servidor no es un JSON válido. Revisa la consola (F12) para ver los detalles del error en PHP.';
+            }
+        } catch (e) {
+            // ignore parse errors
         }
+
         showNotification(errorMessage, 'error');
     });
 }

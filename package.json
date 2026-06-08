@@ -11,7 +11,9 @@
     "prisma:push": "npx prisma db push",
     "prisma:generate": "npx prisma generate",
     "prisma:migrate:deploy": "npx prisma migrate deploy",
-    "deploy:railway": "echo 'Use Railway UI or CLI to deploy; set environment variables in Railway'"
+    "deploy:railway": "echo 'Use Railway UI or CLI to deploy; set environment variables in Railway'",
+    "dev:local": "cross-env ENV_PATH=.env.local NODE_ENV=local nodemon --watch src --exec \"node src/server.js\"",
+    "dev:railway": "cross-env ENV_PATH=.env.railway NODE_ENV=railway nodemon --watch src --exec \"node src/server.js\""
   },
   "dependencies": {
     "@prisma/client": "^4.16.2",
@@ -30,6 +32,7 @@
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.17",
     "autoprefixer": "^10.4.22",
+    "cross-env": "^7.0.3",
     "nodemon": "^3.1.10",
     "postcss": "^8.5.6",
     "prisma": "^4.16.2",

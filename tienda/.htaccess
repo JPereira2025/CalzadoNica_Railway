@@ -1,0 +1,6 @@
+# Bloqueo absoluto de acceso vía Apache (XAMPP)
+# Esto evita que alguien entre por http://localhost/CalzadoNica/public/tienda/
+<IfModule mod_authz_core.c>
+    Require all denied
+</IfModule>
+Deny from all

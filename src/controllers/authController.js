@@ -310,6 +310,7 @@ async function resendToken(req, res, next) {
   if (!usernameOrEmail) return next({ status: 400, message: 'usernameOrEmail es requerido' });
 
   try {
+    console.info(`[RESEND_TOKEN] Request to resend token for: ${usernameOrEmail}`);
     // intentar encontrar en clientes
     const cliente = await prisma.clientes.findFirst({ where: { email: usernameOrEmail } });
     if (cliente) {
@@ -329,12 +330,16 @@ async function resendToken(req, res, next) {
         return next({ status: 500, message: 'Error al reenviar el correo de verificación' });
       }
       // En modo debug, devolver también el token en la respuesta para pruebas locales
+      if (process.env.DEBUG_RESEND === 'true' || process.env.NODE_ENV === 'development') {
+        return res.json({ success: true, message: 'Token reenviado. Revisa tu correo.', token: verificationToken });
+      }
       return res.json({ success: true, message: 'Token reenviado. Revisa tu correo.' });
     }
 
     // intentar encontrar en usuarios
     const user = await prisma.usuarios.findFirst({ where: { OR: [{ username: usernameOrEmail }, { email: usernameOrEmail }] } });
     if (user) {
+      console.info(`[RESEND_TOKEN] Found user id=${user.id} username=${user.username} email=${user.email}`);
       const verificationToken = jwt.sign({ id: user.id, username: user.username, email: user.email, type: 'email_verification' }, JWT_SECRET, { expiresIn: '15m' });
       const expiry = new Date(Date.now() + 15 * 60 * 1000);
       await prisma.usuarios.update({ where: { id: user.id }, data: { verification_token: verificationToken, verification_token_expiry: expiry } });
@@ -350,9 +355,13 @@ async function resendToken(req, res, next) {
         console.error('MAIL ERROR:', mailErr);
         return next({ status: 500, message: 'Error al reenviar el correo de verificación' });
       }
+      if (process.env.DEBUG_RESEND === 'true' || process.env.NODE_ENV === 'development') {
+        return res.json({ success: true, message: 'Token reenviado. Revisa tu correo.', token: verificationToken });
+      }
       return res.json({ success: true, message: 'Token reenviado. Revisa tu correo.' });
     }
 
+    console.info(`[RESEND_TOKEN] No user or cliente found for: ${usernameOrEmail}`);
     return next({ status: 404, message: 'Usuario o correo no encontrado' });
   } catch (error) {
     next(error);

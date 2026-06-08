@@ -3,24 +3,24 @@ generator client {
 }
 
 datasource db {
-  provider = "mysql"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
 model categorias {
   id          String  @id @db.VarChar(50)
-  nombre      String  @unique(map: "nombre") @db.VarChar(100)
-  descripcion String? @db.Text
+  nombre      String  @unique @db.VarChar(100)
+  descripcion String?
 }
 
 model codigos_promocionales {
   id                   String   @id @db.VarChar(20)
-  codigo               String   @unique(map: "codigo") @db.VarChar(20)
+  codigo               String   @unique @db.VarChar(20)
   porcentaje_descuento Int
   fecha_inicio         DateTime @db.Date
   fecha_fin            DateTime @db.Date
   estado               Boolean  @default(true)
-  descripcion          String?  @db.Text
+  descripcion          String?
 }
 
 model empleados {
@@ -29,18 +29,18 @@ model empleados {
   apellidos    String         @db.VarChar(100)
   sueldo       Decimal        @db.Decimal(10, 2)
   nacimiento   DateTime       @db.Date
-  cedula       String         @unique(map: "cedula") @db.VarChar(20)
+  cedula       String         @unique @db.VarChar(20)
   sexo         empleados_sexo
   estado_civil String         @db.VarChar(50)
   telefono     String         @db.VarChar(20)
-  direccion    String         @db.Text
+  direccion    String
   cargo        String         @db.VarChar(100)
 }
 
 model estilos {
   id          String  @id @db.VarChar(50)
-  nombre      String  @unique(map: "nombre") @db.VarChar(100)
-  descripcion String? @db.Text
+  nombre      String  @unique @db.VarChar(100)
+  descripcion String?
 }
 
 model factura_items {
@@ -53,15 +53,15 @@ model factura_items {
   facturas        facturas  @relation(fields: [id_factura], references: [id], onDelete: Cascade, map: "factura_items_ibfk_1")
   productos       productos @relation(fields: [id_producto], references: [id], onDelete: Cascade, map: "factura_items_ibfk_2")
 
-  @@index([id_factura], map: "id_factura")
-  @@index([id_producto], map: "id_producto")
+  @@index([id_factura])
+  @@index([id_producto])
 }
 
 model facturas {
   id               String          @id @db.VarChar(20)
   cliente          String          @db.VarChar(255)
   vendedor         String          @db.VarChar(50)
-  fecha            DateTime        @db.DateTime(0)
+  fecha            DateTime
   subtotal         Decimal         @db.Decimal(10, 2)
   monto_descuento  Decimal         @default(0.00) @db.Decimal(10, 2)
   iva              Decimal         @default(0.00) @db.Decimal(10, 2)
@@ -71,32 +71,33 @@ model facturas {
 }
 
 model productos {
-  id            String          @id @db.VarChar(50)
-  marca         String          @db.VarChar(100)
-  modelo        String          @db.VarChar(100)
-  talla         String          @db.VarChar(10)
-  color         String?         @db.VarChar(255)
-  categoria_id  String?         @db.VarChar(20)
-  estilo_id     String?         @db.VarChar(20)
-  precio        Decimal         @db.Decimal(10, 2)
+  id            String              @id @db.VarChar(50)
+  marca         String              @db.VarChar(100)
+  modelo        String              @db.VarChar(100)
+  talla         String              @db.VarChar(10)
+  color         String?             @db.VarChar(255)
+  categoria_id  String?             @db.VarChar(20)
+  estilo_id     String?             @db.VarChar(20)
+  precio        Decimal             @db.Decimal(10, 2)
   stock         Int
-  imagenes      producto_imagenes[]
   factura_items factura_items[]
   pedido_items  pedido_items[]
+  imagenes      producto_imagenes[]
 
   @@index([categoria_id], map: "categoria_id")
-  @@index([estilo_id], map: "estilo_id")
+  @@index([categoria_id])
+  @@index([estilo_id])
 }
 
 model producto_imagenes {
-  id         Int        @id @default(autoincrement())
-  producto_id String    @db.VarChar(50)
-  url        String     @db.VarChar(500)
-  es_principal Boolean  @default(false)
-  orden      Int        @default(0)
-  productos  productos  @relation(fields: [producto_id], references: [id], onDelete: Cascade)
+  id           Int       @id @default(autoincrement())
+  producto_id  String    @db.VarChar(50)
+  url          String    @db.VarChar(500)
+  es_principal Boolean   @default(false)
+  orden        Int       @default(0)
+  productos    productos @relation(fields: [producto_id], references: [id], onDelete: Cascade)
 
-  @@index([producto_id], map: "producto_id")
+  @@index([producto_id])
 }
 
 /// The underlying table does not contain a valid unique identifier and can therefore currently not be handled by Prisma Client.
@@ -115,72 +116,60 @@ model productos_backup {
 }
 
 model usuarios {
-  id       Int           @id @default(autoincrement())
-  username String        @unique(map: "username") @db.VarChar(50)
-  password String        @db.VarChar(255)
-  role     usuarios_role
-  email    String?       @unique(map: "email") @db.VarChar(255)
-  verified Boolean      @default(false)
-  verification_token String? @db.VarChar(500)
-  verification_token_expiry DateTime? @db.DateTime(0)
-}
-
-enum usuarios_role {
-  Administrador
-  Gerente
-  Vendedor
-}
-
-enum empleados_sexo {
-  Masculino
-  Femenino
-  Otro
+  id                        Int           @id @default(autoincrement())
+  username                  String        @unique @db.VarChar(50)
+  password                  String        @db.VarChar(255)
+  role                      usuarios_role
+  email                     String?       @unique @db.VarChar(255)
+  verified                  Boolean       @default(false)
+  verification_token        String?       @db.VarChar(500)
+  verification_token_expiry DateTime?
 }
 
 model clientes {
-  id              Int           @id @default(autoincrement())
-  email           String        @unique(map: "email") @db.VarChar(255)
-  password        String        @db.VarChar(255)
-  nombres         String        @db.VarChar(100)
-  apellidos       String        @db.VarChar(100)
-  telefono        String?       @db.VarChar(20)
-  fecha_registro  DateTime      @default(now()) @db.DateTime(0)
-  verificado      Boolean       @default(false)
-  token_verificacion String?    @db.VarChar(500)
-  token_expiry    DateTime?     @db.DateTime(0)
-  pedidos         pedidos[]
-  direcciones     direcciones[]
+  id                 Int           @id @default(autoincrement())
+  email              String        @unique @db.VarChar(255)
+  password           String        @db.VarChar(255)
+  nombres            String        @db.VarChar(100)
+  apellidos          String        @db.VarChar(100)
+  telefono           String?       @db.VarChar(20)
+  fecha_registro     DateTime      @default(now())
+  verificado         Boolean       @default(false)
+  token_verificacion String?       @db.VarChar(500)
+  token_expiry       DateTime?
+  direcciones        direcciones[]
+  pedidos            pedidos[]
 }
 
 model direcciones {
-  id          Int      @id @default(autoincrement())
-  cliente_id  Int
-  nombre      String   @db.VarChar(100)
-  telefono    String   @db.VarChar(20)
-  provincia   String   @db.VarChar(100)
-  ciudad      String   @db.VarChar(100)
-  direccion_exacta String @db.Text
-  es_predeterminada Boolean @default(false)
-  clientes    clientes @relation(fields: [cliente_id], references: [id], onDelete: Cascade)
+  id                Int      @id @default(autoincrement())
+  cliente_id        Int
+  nombre            String   @db.VarChar(100)
+  telefono          String   @db.VarChar(20)
+  provincia         String   @db.VarChar(100)
+  ciudad            String   @db.VarChar(100)
+  direccion_exacta  String
+  es_predeterminada Boolean  @default(false)
+  clientes          clientes @relation(fields: [cliente_id], references: [id], onDelete: Cascade)
 
-  @@index([cliente_id], map: "cliente_id")
+  @@index([cliente_id])
 }
 
 model pedidos {
-  id              Int           @id @default(autoincrement())
-  cliente_id      Int
-  fecha           DateTime      @default(now()) @db.DateTime(0)
-  estado          String        @db.VarChar(50) // pendiente, confirmado, enviado, entregado, cancelado
-  subtotal        Decimal       @db.Decimal(10, 2)
-  monto_descuento Decimal       @default(0.00) @db.Decimal(10, 2)
-  codigo_descuento String?      @db.VarChar(50)
-  total           Decimal       @db.Decimal(10, 2)
-  metodo_pago     String        @db.VarChar(50)
-  notas           String?       @db.Text
-  cliente         clientes      @relation(fields: [cliente_id], references: [id])
-  items           pedido_items[]
+  id               Int            @id @default(autoincrement())
+  cliente_id       Int
+  fecha            DateTime       @default(now())
+  estado           String         @db.VarChar(50)
+  subtotal         Decimal        @db.Decimal(10, 2)
+  monto_descuento  Decimal        @default(0.00) @db.Decimal(10, 2)
+  codigo_descuento String?        @db.VarChar(50)
+  total            Decimal        @db.Decimal(10, 2)
+  metodo_pago      String         @db.VarChar(50)
+  notas            String?
+  items            pedido_items[]
+  cliente          clientes       @relation(fields: [cliente_id], references: [id])
 
-  @@index([cliente_id], map: "cliente_id")
+  @@index([cliente_id])
 }
 
 model pedido_items {
@@ -193,6 +182,18 @@ model pedido_items {
   pedidos         pedidos   @relation(fields: [pedido_id], references: [id], onDelete: Cascade)
   productos       productos @relation(fields: [producto_id], references: [id])
 
-  @@index([pedido_id], map: "pedido_id")
-  @@index([producto_id], map: "producto_id")
+  @@index([pedido_id])
+  @@index([producto_id])
+}
+
+enum usuarios_role {
+  Administrador
+  Gerente
+  Vendedor
+}
+
+enum empleados_sexo {
+  Masculino
+  Femenino
+  Otro
 }

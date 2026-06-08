@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Producto - Calzado Nica</title>
+  <link rel="stylesheet" href="/tienda/css/tienda.css">
+</head>
+
+<body>
+  <!-- Navbar -->
+  <nav class="navbar">
+    <div class="navbar-content">
+      <a href="/tienda/" class="logo">Tienda</a>
+      <div class="nav-links">
+        <select id="nav-productos" class="nav-productos">
+          <option value="">Productos</option>
+        </select>
+        <a href="/tienda/">Tienda</a>
+        <div class="cart-icon" onclick="irAlCarrito()">
+          🛒
+          <span class="cart-count" id="cart-count">0</span>
+        </div>
+        <div class="auth-buttons" id="auth-buttons">
+          <button class="btn-auth btn-login" onclick="abrirModal('login')">Ingresar</button>
+          <button class="btn-auth btn-register" onclick="abrirModal('register')">Registrarse</button>
+        </div>
+        <div class="user-menu" id="user-menu" style="display:none;">
+          <span class="user-name" id="user-name"></span>
+          <button class="btn-logout" onclick="logout()">Salir</button>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Contenido Principal -->
+  <main class="container">
+    <a href="/tienda/" class="btn-volver">&larr; Volver a la tienda</a>
+
+    <div class="detalle-producto" id="detalle-producto">
+      <!-- Se carga dinámicamente -->
+      <div class="galeria-producto">
+        <img src="/tienda/img/sin-imagen.svg" alt="Producto" class="galeria-principal" id="img-principal">
+        <div class="galeria-miniaturas" id="miniaturas"></div>
+      </div>
+      <div class="info-producto">
+        <span class="marca" id="producto-marca"></span>
+        <h1 id="producto-nombre"></h1>
+        <p class="producto-detalles" id="producto-detalles"></p>
+        <p class="producto-precio" id="producto-precio"></p>
+        <p class="producto-stock" id="producto-stock"></p>
+        <div class="selector-talla">
+          <label>Talla:</label>
+          <select id="talla" style="padding:0.4rem 0.6rem; margin-right:0.6rem;">
+            <option value="">Selecciona talla</option>
+          </select>
+        </div>
+
+        <div class="selector-cantidad">
+          <label>Cantidad:</label>
+          <button onclick="cambiarCantidad(-1)">-</button>
+          <input type="number" id="cantidad" value="1" min="1" max="10">
+          <button onclick="cambiarCantidad(1)">+</button>
+        </div>
+
+        <button class="btn-agregar-carrito" id="btn-agregar" onclick="agregarAlCarrito()">
+          🛒 Agregar al Carrito
+        </button>
+      </div>
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <p>&copy; 2024 Calzado Nica. Todos los derechos reservados.</p>
+  </footer>
+
+  <!-- Modal de Autenticación -->
+  <div class="modal" id="auth-modal">
+    <div class="modal-content">
+      <button class="modal-close" onclick="cerrarModal()">&times;</button>
+      <div class="modal-tabs">
+        <div class="modal-tab active" data-tab="login" onclick="cambiarTab('login')">Iniciar Sesión</div>
+        <div class="modal-tab" data-tab="register" onclick="cambiarTab('register')">Registrarse</div>
+      </div>
+
+      <form class="modal-form active" id="login-form" onsubmit="handleLogin(event)">
+        <div class="form-group">
+          <label>Correo electrónico</label>
+          <input type="email" name="email" required>
+        </div>
+        <div class="form-group">
+          <label>Contraseña</label>
+          <input type="password" name="password" required>
+        </div>
+        <div class="error-message" id="login-error"></div>
+        <button type="submit" class="btn-submit">Ingresar</button>
+      </form>
+
+      <form class="modal-form" id="register-form" onsubmit="handleRegister(event)">
+        <div class="form-group">
+          <label>Correo electrónico</label>
+          <input type="email" name="email" required>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Nombres</label>
+            <input type="text" name="nombres" required>
+          </div>
+          <div class="form-group">
+            <label>Apellidos</label>
+            <input type="text" name="apellidos" required>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Teléfono</label>
+          <input type="tel" name="telefono">
+        </div>
+        <div class="form-group">
+          <label>Contraseña</label>
+          <input type="password" name="password" required minlength="6">
+        </div>
+        <div class="form-group">
+          <label>Confirmar Contraseña</label>
+          <input type="password" name="confirmPassword" required>
+        </div>
+        <div class="error-message" id="register-error"></div>
+        <div class="success-message" id="register-success"></div>
+        <button type="submit" class="btn-submit">Crear Cuenta</button>
+      </form>
+    </div>
+  </div>
+
+  <script src="/tienda/js/tienda.js"></script>
+  <script>
+    // Cargar producto al iniciar
+    document.addEventListener('DOMContentLoaded', () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const productoId = urlParams.get('id');
+      if (productoId) {
+        cargarDetalleProducto(productoId);
+      } else {
+        window.location.href = '/tienda/';
+      }
+    });
+  </script>
+</body>
+
+</html>

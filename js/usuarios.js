@@ -29,6 +29,33 @@ function setupUsuariosListeners() {
             });
         }
     });
+    $(document).on("click", ".btn-resend-token", function(e) {
+        e.preventDefault();
+        if (!ensureAdminAction('reenviar token')) return;
+        const $row = $(this).closest('tr');
+        const id = $row.data('id');
+        const email = $row.find('td').eq(2).text().trim();
+        const username = $row.find('td').eq(1).text().trim();
+        const target = email || username;
+        if (!target) {
+            showNotification('No hay email ni usuario disponible para reenviar token', 'error');
+            return;
+        }
+        const $btn = $(this);
+        const prevHtml = $btn.html();
+        $btn.prop('disabled', true).html('Enviando...');
+        apiCall('/resend-token', 'POST', { usernameOrEmail: target })
+            .done(res => {
+                showNotification(res.message || 'Token reenviado. Revisa el correo.', 'success');
+            })
+            .fail((xhr) => {
+                const msg = (xhr && xhr.responseJSON && xhr.responseJSON.message) || 'Error reenviando token';
+                showNotification(msg, 'error');
+            })
+            .always(() => {
+                $btn.prop('disabled', false).html(prevHtml);
+            });
+    });
     $(document).on("submit", "#form-usuario", function(e) {
         e.preventDefault();
         handleUsuarioSubmit(e);
@@ -132,6 +159,7 @@ function renderUsuarioRow(usuario) {
         <td class="py-3 px-4">${usuario.verified ? 'Sí' : 'No'}</td>
         <td class="py-3 px-4 text-center">
             <button class="btn-edit-usuario text-blue-600 hover:text-blue-800 mx-1" title="Editar"><i class="fas fa-edit"></i></button>
+            <button class="btn-resend-token text-green-600 hover:text-green-800 mx-1" title="Reenviar token"><i class="fas fa-paper-plane"></i></button>
             <button class="btn-delete-usuario text-red-600 hover:text-red-800 mx-1" title="Eliminar"><i class="fas fa-trash-alt"></i></button>
         </td>
     </tr>`;

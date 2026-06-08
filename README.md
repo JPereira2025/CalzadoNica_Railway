@@ -57,6 +57,34 @@ Importante: nunca subas el archivo `.env` con credenciales. Usa `.env.example` p
 ```powershell
 npm run dev:api
 ```
+en railway SELECT * FROM usuarios WHERE username='';
+select * FROM usuarios where id= ;
+Reenvio de Token en PS
+curl -s -X POST http://localhost:3001/resend-token -H "Content-Type: application/json" -d '{"usernameOrEmail":"mierdil2019@gmail.com"}' -i
+
+intentar login con credenciales (verás la respuesta JSON / status):
+curl -s -X POST http://localhost:3001/login -H "Content-Type: application/json" -d '{"username":"JGuadamuz","password":"contraseña_incorrecta"}' -i
+
+
+  -
+
+**Ejecución local (PostgreSQL / Prisma)**
+
+Si usas `DATABASE_URL` de PostgreSQL (por ejemplo Railway) sigue estos pasos antes de iniciar el servidor:
+
+```bash
+cp .env.example .env
+# Edita .env y pega tu DATABASE_URL (no subir .env al repo)
+npm install
+npx prisma generate
+npx prisma db push
+# Iniciar en modo desarrollo (con recarga automática):
+npm run dev:api
+# O iniciar una sola vez:
+npm run start:api
+```
+
+Si la base de datos es remota (Railway), asegúrate de tener la `DATABASE_URL` correcta y las variables `JWT_SECRET`, `EMAIL_*` en tu `.env` local o en las variables del servicio.
 
 ### Rutas de entrada (URLs)
 

@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Checkout - Calzado Nica</title>
+  <link rel="stylesheet" href="/tienda/css/tienda.css">
+</head>
+
+<body>
+  <!-- Navbar -->
+  <nav class="navbar">
+    <div class="navbar-content">
+      <a href="/tienda/" class="logo"><img src="img/calzado_nica_logo.png" alt="Calzado Nica" class="store-logo-small">Calzado Nica</a>
+      <div class="nav-links">
+        <a href="/tienda/">Tienda</a>
+        <div class="cart-icon">
+          🛒
+          <span class="cart-count" id="cart-count">0</span>
+        </div>
+        <div class="auth-buttons" id="auth-buttons">
+          <button class="btn-auth btn-login" onclick="abrirModal('login')">Ingresar</button>
+          <button class="btn-auth btn-register" onclick="abrirModal('register')">Registrarse</button>
+        </div>
+        <div class="user-menu" id="user-menu" style="display:none;">
+          <span class="user-name" id="user-name"></span>
+          <button class="btn-logout" onclick="logout()">Salir</button>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Contenido Principal -->
+  <main class="container">
+    <a href="/tienda/carrito.html" class="btn-volver">&larr; Volver al carrito</a>
+
+    <div id="login-required" style="display:none; background:#fff3cd; border:1px solid #ffeeba; padding:1rem; margin:1rem 0; border-radius:6px;">
+      Debes iniciar sesión para completar el pago. <button onclick="abrirModal('login')" style="margin-left:0.5rem; padding:0.3rem 0.6rem; background:#0d6efd; color:white; border:none; border-radius:4px;">Iniciar sesión</button>
+    </div>
+
+    <h1 style="margin-bottom: 2rem;">Finalizar Pedido</h1>
+
+    <div class="checkout-container">
+      <!-- Formulario de Envío y Pago -->
+      <div class="checkout-form">
+        <h2>📦 Información de Envío</h2>
+
+        <form id="checkout-form" onsubmit="procesarPedido(event)">
+          <!-- Datos del cliente -->
+          <div id="cliente-info-section">
+            <div class="form-row">
+              <div class="form-group">
+                <label>Nombre(s) *</label>
+                <input type="text" name="nombres" id="nombres" required>
+              </div>
+              <div class="form-group">
+                <label>Apellido(s) *</label>
+                <input type="text" name="apellidos" id="apellidos" required>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>Correo electrónico *</label>
+                <input type="email" name="email" id="email" required>
+              </div>
+              <div class="form-group">
+                <label>Teléfono *</label>
+                <input type="tel" name="telefono" id="telefono" required>
+              </div>
+            </div>
+          </div>
+
+          <!-- Dirección de envío -->
+          <h2 style="margin-top: 2rem;">🏠 Dirección de Envío</h2>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label>Provincia/Departamento *</label>
+              <input type="text" name="provincia" id="provincia" required>
+            </div>
+            <div class="form-group">
+              <label>Ciudad/Municipio *</label>
+              <input type="text" name="ciudad" id="ciudad" required>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Dirección exacta (barrio, calle, número, referencias) *</label>
+            <textarea name="direccion_exacta" id="direccion_exacta" required
+              placeholder="Ej: Barrio El Carmen, Calle Principal, frente al mercado, casa color azul"></textarea>
+          </div>
+
+          <!-- Método de pago -->
+          <h2 style="margin-top: 2rem;">💳 Método de Pago</h2>
+
+          <div class="form-group">
+            <select name="metodo_pago" id="metodo_pago" required>
+              <option value="">Seleccione un método de pago</option>
+              <option value="transferencia">Transferencia Bancaria</option>
+              <option value="pago_movil">Billetera Móvil</option>
+              <option value="efectivo">Pago en Efectivo (contra entrega)</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label>Notas del pedido (opcional)</label>
+            <textarea name="notas" id="notas"
+              placeholder="Instrucciones especiales, preferencias de entrega, etc."></textarea>
+          </div>
+
+          <!-- Detalles para métodos de pago específicos -->
+          <div id="payment-details">
+            <div id="transferencia-section" style="display:none; margin-top:1rem;">
+              <h3>Detalles de Transferencia</h3>
+              <div class="form-group">
+                <label>Número de transferencia</label>
+                <input type="text" id="transfer_numero" placeholder="Ej: 123456789">
+              </div>
+              <div class="form-group">
+                <label>A nombre de (titular)</label>
+                <input type="text" id="transfer_nombre" placeholder="Nombre del titular">
+              </div>
+              <div class="form-group">
+                <label>Banco</label>
+                <input type="text" id="transfer_banco" placeholder="Nombre del banco">
+              </div>
+              <div class="form-group">
+                <label>Comprobante (imagen, opcional)</label>
+                <input type="file" id="transfer_comprobante" accept="image/*">
+              </div>
+            </div>
+
+            <div id="billetera-section" style="display:none; margin-top:1rem;">
+              <h3>Detalles de Billetera Móvil</h3>
+              <div class="form-group">
+                <label>Número de billetera</label>
+                <input type="text" id="billetera_numero" placeholder="Número de teléfono o cuenta">
+              </div>
+              <div class="form-group">
+                <label>Código de transacción</label>
+                <input type="text" id="billetera_codigo" placeholder="Código/ID de la transacción">
+              </div>
+              <div class="form-group">
+                <label>A nombre de (titular)</label>
+                <input type="text" id="billetera_nombre" placeholder="Nombre del titular">
+              </div>
+              <div class="form-group">
+                <label>Comprobante (imagen, opcional)</label>
+                <input type="file" id="billetera_comprobante" accept="image/*">
+              </div>
+            </div>
+          </div>
+
+          <div class="error-message" id="checkout-error" style="margin-bottom: 1rem;"></div>
+
+          <button type="submit" class="btn-continuar" id="btn-confirmar">
+            ✓ Confirmar Pedido
+          </button>
+        </form>
+      </div>
+
+      <!-- Resumen del pedido -->
+      <div class="checkout-resumen">
+        <h2>📋 Resumen del Pedido</h2>
+
+        <div id="resumen-items">
+          <!-- Items se cargan aquí -->
+        </div>
+
+        <div class="resumen-item">
+          <span>Subtotal</span>
+          <span id="resumen-subtotal">C$ 0.00</span>
+        </div>
+        <div class="resumen-item" id="resumen-descuento-row" style="display: none;">
+          <span>Descuento</span>
+          <span id="resumen-descuento" style="color: var(--success);">-C$ 0.00</span>
+        </div>
+        <div class="resumen-item total">
+          <span>Total</span>
+          <span id="resumen-total">C$ 0.00</span>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <p>&copy; 2024 Calzado Nica. Todos los derechos reservados.</p>
+  </footer>
+
+  <!-- Modal de Autenticación -->
+  <div class="modal" id="auth-modal">
+    <div class="modal-content">
+      <button class="modal-close" onclick="cerrarModal()">&times;</button>
+      <div class="modal-tabs">
+        <div class="modal-tab active" data-tab="login" onclick="cambiarTab('login')">Iniciar Sesión</div>
+        <div class="modal-tab" data-tab="register" onclick="cambiarTab('register')">Registrarse</div>
+      </div>
+
+      <form class="modal-form active" id="login-form" onsubmit="handleLogin(event)">
+        <div class="form-group">
+          <label>Correo electrónico</label>
+          <input type="email" name="email" required>
+        </div>
+        <div class="form-group">
+          <label>Contraseña</label>
+          <input type="password" name="password" required>
+        </div>
+        <div class="error-message" id="login-error"></div>
+        <button type="submit" class="btn-submit">Ingresar</button>
+      </form>
+
+      <form class="modal-form" id="register-form" onsubmit="handleRegister(event)">
+        <div class="form-group">
+          <label>Correo electrónico</label>
+          <input type="email" name="email" required>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Nombres</label>
+            <input type="text" name="nombres" required>
+          </div>
+          <div class="form-group">
+            <label>Apellidos</label>
+            <input type="text" name="apellidos" required>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Teléfono</label>
+          <input type="tel" name="telefono">
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Provincia/Departamento</label>
+            <input type="text" name="provincia">
+          </div>
+          <div class="form-group">
+            <label>Ciudad/Municipio</label>
+            <input type="text" name="ciudad">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Dirección (barrio, calle, referencia)</label>
+          <input type="text" name="direccion">
+        </div>
+        <div class="form-group">
+          <label><input type="checkbox" name="guardarDireccion"> Guardar esta dirección en mi cuenta</label>
+        </div>
+        <div class="form-group">
+          <label>Contraseña</label>
+          <input type="password" name="password" required minlength="6">
+        </div>
+        <div class="form-group">
+          <label>Confirmar Contraseña</label>
+          <input type="password" name="confirmPassword" required>
+        </div>
+        <div class="error-message" id="register-error"></div>
+        <div class="success-message" id="register-success"></div>
+        <button type="submit" class="btn-submit">Crear Cuenta</button>
+      </form>
+    </div>
+  </div>
+
+  <script src="/tienda/js/tienda.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      inicializarCheckout();
+    });
+  </script>
+</body>
+
+</html>

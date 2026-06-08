@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Calzado Nica - Tienda Online</title>
+  <link rel="stylesheet" href="/tienda/css/tienda.css">
+  <link rel="icon" href="/favicon.ico" />
+  <style>
+    /* Logo en navbar */
+    .store-logo-small { height: 56px; vertical-align: middle; margin-right: 8px; }
+    /* Logo grande junto a bienvenida */
+    .store-hero { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+    .store-logo-large { height: 220px; width: auto; }
+    .store-hero h1 { margin: 0; font-size: 2.25rem; }
+    .store-hero-right { display:flex; gap:12px; align-items:center; }
+    .store-side-logo { height:192px; width:auto; box-shadow: 0 6px 18px rgba(0,0,0,0.12); border-radius:6px; background:#fff; padding:6px; }
+  </style>
+</head>
+
+<body>
+  <!-- Navbar -->
+  <nav class="navbar">
+    <div class="navbar-content">
+      <a href="/" class="logo"><img src="img/calzado_nica_logo.png" alt="Calzado Nica" class="store-logo-small">Calzado Nica</a>
+      <div class="nav-links">
+        <select id="nav-productos" class="nav-productos">
+          <option value="">Productos</option>
+        </select>
+        <a href="/tienda/">Tienda</a>
+        <div class="cart-icon" onclick="irAlCarrito()">
+          🛒
+          <span class="cart-count" id="cart-count">0</span>
+        </div>
+        <div class="auth-buttons" id="auth-buttons">
+          <button class="btn-auth btn-login" onclick="abrirModal('login')">Ingresar</button>
+          <button class="btn-auth btn-register" onclick="abrirModal('register')">Registrarse</button>
+        </div>
+        <div class="user-menu" id="user-menu" style="display:none;">
+          <span class="user-name" id="user-name"></span>
+          <button class="btn-logout" onclick="logout()">Salir</button>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Hero -->
+  <section class="hero">
+    <div class="store-hero">
+      <div class="store-hero-left" style="display:flex;align-items:center;gap:16px;">
+        <img src="img/calzado_nica_logo.png" alt="Calzado Nica" class="store-logo-large">
+        <div>
+          <h1>¡Bienvenido a Calzado Nica!</h1>
+          <p>Encuentra los mejores zapatos al mejor precio</p>
+        </div>
+      </div>
+      <div class="store-hero-right">
+        <img src="img/logo_cuero.png" alt="Logo Cuero" class="store-side-logo">
+        <img src="img/logo_bordado.png" alt="Logo Bordado" class="store-side-logo">
+      </div>
+    </div>
+  </section>
+
+  <!-- Contenido Principal -->
+  <main class="container">
+    <!-- Filtros -->
+    <div class="filtros">
+      <select id="filtro-categoria" onchange="cargarProductos()">
+        <option value="">Todas las categorías</option>
+      </select>
+      <select id="filtro-estilo" onchange="cargarProductos()">
+        <option value="">Todos los estilos</option>
+      </select>
+      <select id="filtro-orden" onchange="cargarProductos()">
+        <option value="recientes">Más recientes</option>
+        <option value="precio-asc">Precio: menor a mayor</option>
+        <option value="precio-desc">Precio: mayor a menor</option>
+      </select>
+      <input type="text" id="filtro-busqueda" placeholder="Buscar productos..." onkeyup="buscarProductos()">
+    </div>
+
+    <!-- Grid de Productos -->
+    <div class="productos-grid" id="productos-grid">
+      <!-- Los productos se cargan dinámicamente -->
+    </div>
+
+    <!-- Paginación -->
+    <div class="paginacion" id="paginacion"></div>
+  </main>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <p>&copy; 2024 Calzado Nica. Todos los derechos reservados.</p>
+  </footer>
+
+  <!-- Modal de Autenticación -->
+  <div class="modal" id="auth-modal">
+    <div class="modal-content">
+      <button class="modal-close" onclick="cerrarModal()">&times;</button>
+      <div class="modal-tabs">
+        <div class="modal-tab active" data-tab="login" onclick="cambiarTab('login')">Iniciar Sesión</div>
+        <div class="modal-tab" data-tab="register" onclick="cambiarTab('register')">Registrarse</div>
+      </div>
+
+      <!-- Formulario de Login -->
+      <form class="modal-form active" id="login-form" onsubmit="handleLogin(event)">
+        <div class="form-group">
+          <label>Correo electrónico</label>
+          <input type="email" name="email" required>
+        </div>
+        <div class="form-group">
+          <label>Contraseña</label>
+          <input type="password" name="password" required>
+        </div>
+        <div class="error-message" id="login-error"></div>
+        <button type="submit" class="btn-submit">Ingresar</button>
+      </form>
+
+      <!-- Formulario de Registro -->
+      <form class="modal-form" id="register-form" onsubmit="handleRegister(event)">
+        <div class="form-group">
+          <label>Correo electrónico</label>
+          <input type="email" name="email" required>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Nombres</label>
+            <input type="text" name="nombres" required>
+          </div>
+          <div class="form-group">
+            <label>Apellidos</label>
+            <input type="text" name="apellidos" required>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Teléfono</label>
+          <input type="tel" name="telefono">
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>Provincia</label>
+            <input type="text" name="provincia">
+          </div>
+          <div class="form-group">
+            <label>Ciudad</label>
+            <input type="text" name="ciudad">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Dirección</label>
+          <input type="text" name="direccion">
+        </div>
+        <div class="form-group">
+          <label><input type="checkbox" name="guardarDireccion" value="1"> Guardar dirección para futuras compras</label>
+        </div>
+        <div class="form-group">
+          <label>Contraseña</label>
+          <input type="password" name="password" required minlength="6">
+        </div>
+        <div class="form-group">
+          <label>Confirmar Contraseña</label>
+          <input type="password" name="confirmPassword" required>
+        </div>
+        <div class="error-message" id="register-error"></div>
+        <div class="success-message" id="register-success"></div>
+        <button type="submit" class="btn-submit">Crear Cuenta</button>
+      </form>
+    </div>
+  </div>
+
+    <!-- Modal de Verificación (Tienda) -->
+    <div class="modal" id="verify-modal-store">
+      <div class="modal-content">
+        <button class="modal-close" onclick="document.getElementById('verify-modal-store').classList.remove('active')">&times;</button>
+        <h3>Verifica tu cuenta</h3>
+        <p id="verify-instructions">Hemos enviado un token a tu correo. Pega el token abajo para verificar tu cuenta.</p>
+        <form id="verify-form-store" onsubmit="return window.handleVerifyStore && window.handleVerifyStore(event)">
+          <div class="form-group">
+            <label>Correo o usuario</label>
+            <input type="text" id="verify-usernameOrEmail-store" required>
+          </div>
+          <div class="form-group">
+            <label>Token de verificación</label>
+            <input type="text" id="verify-token-store" required>
+          </div>
+          <div class="error-message" id="verify-error-store"></div>
+          <div class="success-message" id="verify-success-store"></div>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <button type="submit" class="btn-submit">Verificar</button>
+            <button type="button" id="resend-token-btn-store" class="btn-submit" style="background:#eee;color:#333;" onclick="window.resendTokenStore && window.resendTokenStore()">Reenviar token</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <script src="/tienda/js/tienda.js"></script>
+</body>
+
+</html>
