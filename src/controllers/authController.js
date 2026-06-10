@@ -28,6 +28,11 @@ const transporter = nodemailer.createTransport({
   }
 });
 
+// Verificar conexión SMTP al iniciar y registrar posibles errores
+transporter.verify()
+  .then(() => console.info('[MAIL] Conexión SMTP verificada correctamente'))
+  .catch(err => console.error('[MAIL] Error verificando conexión SMTP:', err));
+
 /**
  * Lógica de inicio de sesión.
  * Soporta contraseñas en texto plano (migración), bcrypt y argon2.
@@ -119,7 +124,7 @@ async function register(req, res, next) {
     if (nombres || apellidos) {
       const existingClient = await prisma.clientes.findFirst({ where: { email } });
       if (existingClient) {
-        return next({ status: 409, message: 'Este correo electrónico ya se encuentra registrado' });
+        return next({ status: 409, message: 'Este correo electrónico ya está registrado. Si no has verificado la cuenta, solicita reenvío del token de verificación.' });
       }
 
       const hash = await bcrypt.hash(password, 10);

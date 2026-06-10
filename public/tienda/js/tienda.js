@@ -856,6 +856,16 @@
     } catch (err) { console.error(err); document.getElementById('register-error').textContent = 'Error de red'; }
   }
 
+  function openVerifyModalFromLogin(e) {
+    if (e && e.preventDefault) e.preventDefault();
+    const email = document.querySelector('#auth-modal input[name="email"]')?.value?.trim();
+    const verifyModal = document.getElementById('verify-modal-store');
+    const inputUser = document.getElementById('verify-usernameOrEmail-store');
+    if (inputUser) inputUser.value = email || '';
+    if (verifyModal) verifyModal.classList.add('active');
+    return false;
+  }
+
   async function handleVerifyStore(e) {
     if (e && e.preventDefault) e.preventDefault();
     const usernameOrEmail = document.getElementById('verify-usernameOrEmail-store')?.value?.trim();
