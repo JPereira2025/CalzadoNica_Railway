@@ -120,9 +120,9 @@ El proyecto utiliza **Tailwind CSS**. Para realizar modificaciones en el diseño
 Si en Windows al arrancar el servidor la consola muestra que el puerto está en uso, hay un script de ayuda que intenta liberar el puerto antes de iniciar el servidor de desarrollo.
 
 - Script: `scripts/free_port_windows.ps1` — PowerShell que detecta procesos escuchando en un puerto (por defecto `3001`) y los termina. Está documentado y pensado solo para entornos de desarrollo en Windows.
-- Comando integrado: `predev:api` en `package.json` ejecuta ese script antes de `dev:api`, por lo que al ejecutar `npm run dev:api` el puerto se intentará liberar automáticamente.
+- Comando directo: `npm run dev:api` arranca el servidor sin ejecutar ningún script adicional.
 
-Ejemplo de uso manual (PowerShell):
+Si necesitas limpiar el puerto manualmente antes de reiniciar el servidor, usa:
 ```powershell
 powershell -File scripts/free_port_windows.ps1 3001
 ```
