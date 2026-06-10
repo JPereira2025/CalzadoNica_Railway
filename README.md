@@ -68,7 +68,7 @@ curl -s -X POST http://localhost:3001/login -H "Content-Type: application/json" 
 
   -
 
-**Ejecución local (PostgreSQL / Prisma)**
+**Ejecución local (PostgreSQL / Prisma / Railway)**
 
 Si usas `DATABASE_URL` de PostgreSQL (por ejemplo Railway) sigue estos pasos antes de iniciar el servidor:
 
@@ -78,19 +78,31 @@ cp .env.example .env
 npm install
 npx prisma generate
 npx prisma db push
-# Iniciar en modo desarrollo (con recarga automática):
-npm run dev:api
-# O iniciar una sola vez:
+# Iniciar en modo desarrollo con Railway / Postgres:
+npm run dev:railway
+# O iniciar en una sola vez:
 npm run start:api
 ```
 
-Si la base de datos es remota (Railway), asegúrate de tener la `DATABASE_URL` correcta y las variables `JWT_SECRET`, `EMAIL_*` en tu `.env` local o en las variables del servicio.
+Si la base de datos es remota (Railway), asegúrate de tener la `DATABASE_URL` correcta y las variables `JWT_SECRET`, `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_USER`, `EMAIL_PASS`, `EMAIL_FROM` en tu `.env` local o como variables del servicio.
+
+Para desarrollo con Railway también puedes crear un archivo `.env.railway` y arrancar con:
+
+```bash
+npm run dev:railway
+```
+
+Esto carga `ENV_PATH=.env.railway` antes de iniciar el servidor.
 
 ### Rutas de entrada (URLs)
 
-- **Webapp (XAMPP/htdocs):** http://localhost/CalzadoNica/  — ejemplo: "Sistema Calzado Nica - v2.6 (Final)"
-- **API / servidor de desarrollo (Node/Express):** http://localhost:3001/  — si ves "Cannot GET /" arranca el servidor con `npm run dev:api`.
-- **Tienda pública (archivos estáticos):** http://localhost:3001/tienda/  — contenido en `public/tienda/`.
+- **Webapp administrativa (XAMPP/htdocs):** http://localhost/CalzadoNica/
+- **API / servidor de desarrollo (Node/Express):** http://localhost:3001/
+- **Login / autenticación:** http://localhost:3001/login
+- **Tienda pública:** http://localhost:3001/tienda/
+- **API de productos (ejemplo):** http://localhost:3001/api/productos
+- **Railway app (producción):** https://<your-railway-app>.up.railway.app/
+- **Railway tienda pública:** https://<your-railway-app>.up.railway.app/tienda/
 
 > Nota: si colocaste la carpeta del proyecto en `htdocs` (XAMPP), la webapp se sirve en `http://localhost/CalzadoNica/`. Cuando el servidor Node está activo en el puerto `3001`, la API y la tienda estarán disponibles en `http://localhost:3001/` y `http://localhost:3001/tienda/` respectivamente.
 
