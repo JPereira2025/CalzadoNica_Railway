@@ -825,7 +825,20 @@
         const el = document.getElementById('register-error');
         if (res.status === 409) {
           if (el) {
-            el.innerHTML = `Este correo ya está registrado. <br><a href="#" onclick="event.preventDefault(); window.tienda.irAVerificacion('${email}')" style="color: white; text-decoration: underline; font-weight: bold;">Haz clic aquí para verificar tu cuenta</a>`;
+            // Evitar inyectar directamente en `onclick`: crear el link y añadir listener
+            el.innerHTML = '';
+            const text = document.createTextNode('Este correo ya está registrado. ');
+            const br = document.createElement('br');
+            const link = document.createElement('a');
+            link.href = '#';
+            link.style.color = 'white';
+            link.style.textDecoration = 'underline';
+            link.style.fontWeight = 'bold';
+            link.textContent = 'Haz clic aquí para verificar tu cuenta';
+            link.addEventListener('click', function(ev) { ev.preventDefault(); window.tienda && window.tienda.irAVerificacion && window.tienda.irAVerificacion(email); });
+            el.appendChild(text);
+            el.appendChild(br);
+            el.appendChild(link);
             el.style.display = 'block';
           }
         }
@@ -1087,6 +1100,7 @@
     cambiarTab,
     handleLogin,
     handleRegister,
+    openVerifyModalFromLogin,
     irAVerificacion,
     logout
   };
@@ -1131,6 +1145,7 @@
   window.handleRegister = handleRegister;
   window.handleVerifyStore = handleVerifyStore;
   window.resendTokenStore = resendTokenStore;
+  window.openVerifyModalFromLogin = openVerifyModalFromLogin;
   // Exponer aplicarDescuento para botones inline (ej. carrito)
   window.aplicarDescuento = function() { return window.tienda.aplicarDescuento(); };
   // Exponer quitarDescuento
@@ -1222,6 +1237,13 @@
       // initial
       togglePaymentSections();
     }
+    // Listener para links de verificación (evitar onclick inline)
+    document.querySelectorAll('.link-verify-from-login').forEach(link => {
+      link.addEventListener('click', function(ev) {
+        ev.preventDefault();
+        openVerifyModalFromLogin(ev);
+      });
+    });
     updateAuthUI();
   });
 
