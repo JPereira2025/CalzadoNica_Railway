@@ -5,6 +5,7 @@
   "scripts": {
     "build:css": "node build-tailwind.js",
     "watch:css": "nodemon --watch src/css --exec \"node build-tailwind.js\"",
+    "start": "node src/server.js",
     "start:api": "node src/server.js",
     "dev": "nodemon --watch src --exec \"node src/server.js\"",
     "dev:api": "nodemon --watch src --exec \"node src/server.js\"",
