@@ -124,7 +124,7 @@ async function register(req, res, next) {
     if (nombres || apellidos) {
       const existingClient = await prisma.clientes.findFirst({ where: { email } });
       if (existingClient) {
-        return next({ status: 409, message: 'Este correo electrónico ya está registrado. Si no has verificado la cuenta, solicita reenvío del token de verificación.' });
+        return next({ status: 409, message: 'Este correo electrónico ya está registrado.' });
       }
 
       const hash = await bcrypt.hash(password, 10);
@@ -373,18 +373,6 @@ async function resendToken(req, res, next) {
   }
 }
 
-function logout(req, res) {
-  res.json({ success: true, message: 'Sesión cerrada' });
-}
-
-module.exports = {
-  login,
-  logout,
-  register,
-  verifyToken,
-  resendToken
-};
-
 /**
  * Login para la tienda pública (clientes).
  * Usa la tabla `clientes` exclusivamente y retorna token con role 'Cliente'.
@@ -490,6 +478,16 @@ async function updateProfileStore(req, res, next) {
   }
 }
 
-// Exponer loginStore también
-module.exports.loginStore = loginStore;
-module.exports.updateProfileStore = updateProfileStore;
+function logout(req, res) {
+  res.json({ success: true, message: 'Sesión cerrada' });
+}
+
+module.exports = {
+  login,
+  logout,
+  register,
+  verifyToken,
+  resendToken,
+  loginStore,
+  updateProfileStore
+};

@@ -822,30 +822,21 @@
       const res = await fetch('/register', { method: 'POST', headers: { 'Content-Type':'application/json' }, body: JSON.stringify(body) });
       const data = await res.json();
       if (!res.ok) {
-        const el = document.getElementById('register-error'); if (el) { el.textContent = data.message || 'Error registrando'; el.style.display = 'block'; }
-        // Si el correo/usuario ya existe, abrir modal de verificación y reenviar token automáticamente
+        const el = document.getElementById('register-error');
         if (res.status === 409) {
-          try {
-            const verifyModal = document.getElementById('verify-modal-store');
-            const inputUser = document.getElementById('verify-usernameOrEmail-store');
-            if (inputUser) inputUser.value = email;
-            if (verifyModal) verifyModal.classList.add('active');
-            // reintentar envío del token
-            setTimeout(()=>{ window.resendTokenStore && window.resendTokenStore(); }, 200);
-          } catch (e) { /* no bloquear por errores en UI */ }
+          if (el) {
+            el.innerHTML = `Este correo ya está registrado. <br><a href="#" onclick="event.preventDefault(); window.tienda.irAVerificacion('${email}')" style="color: white; text-decoration: underline; font-weight: bold;">Haz clic aquí para verificar tu cuenta</a>`;
+            el.style.display = 'block';
+          }
+        }
+        else {
+          if (el) { el.textContent = data.message || 'Error registrando'; el.style.display = 'block'; }
         }
         return;
       }
       const suc = document.getElementById('register-success'); if (suc) { suc.textContent = data.message || 'Cuenta creada. Revisa tu correo'; suc.style.display = 'block'; }
-      // Mostrar modal de verificación en tienda y pre-llenar el email
-      try {
-        const verifyModal = document.getElementById('verify-modal-store');
-        const inputUser = document.getElementById('verify-usernameOrEmail-store');
-        const inputToken = document.getElementById('verify-token-store');
-        if (inputUser) inputUser.value = email;
-        if (verifyModal) verifyModal.classList.add('active');
-        if (inputToken) { inputToken.value = ''; setTimeout(()=>inputToken.focus(), 200); }
-      } catch (err) { /* no bloquear por errores en UI */ }
+      // After successful registration, open the verification modal and pre-fill email
+      openVerifyModalFromRegister(email);
       // guardar dirección localmente para autocompletar al loguear si el usuario eligió guardar
       try {
         if (guardarDireccion && email) {
@@ -854,6 +845,32 @@
         }
       } catch (e) { console.warn('No se pudo guardar dirección localmente', e); }
     } catch (err) { console.error(err); document.getElementById('register-error').textContent = 'Error de red'; }
+  }
+
+  function irAVerificacion(email) {
+    cerrarModal();
+    const verifyModal = document.getElementById('verify-modal-store');
+    const inputUser = document.getElementById('verify-usernameOrEmail-store');
+    if (inputUser) inputUser.value = email || '';
+    if (verifyModal) {
+      verifyModal.classList.add('active');
+      // Solicitar reenvío automático para conveniencia del usuario
+      setTimeout(() => { window.resendTokenStore && window.resendTokenStore(); }, 300);
+    }
+  }
+
+  /**
+   * Helper function to open the verification modal and pre-fill the email,
+   * used after successful registration or when an existing email is detected.
+   */
+  function openVerifyModalFromRegister(email) {
+    cerrarModal(); // Cerramos el modal de registro para evitar solapamiento
+    const verifyModal = document.getElementById('verify-modal-store');
+    const inputUser = document.getElementById('verify-usernameOrEmail-store');
+    const inputToken = document.getElementById('verify-token-store');
+    if (inputUser) inputUser.value = email || '';
+    if (verifyModal) verifyModal.classList.add('active');
+    if (inputToken) { inputToken.value = ''; setTimeout(()=>inputToken.focus(), 200); }
   }
 
   function openVerifyModalFromLogin(e) {
@@ -1070,6 +1087,7 @@
     cambiarTab,
     handleLogin,
     handleRegister,
+    irAVerificacion,
     logout
   };
 
@@ -1079,6 +1097,7 @@
   window.cambiarTab = cambiarTab;
   window.logout = function(){ window.tienda.logout(); };
   // Compatibilidad: si estamos en la página de detalle, cambiar el input cantidad;
+  // This function is exposed globally for compatibility with inline HTML event handlers.
   // en el carrito se usa directamente `window.tienda.cambiarCantidad(id, delta)`.
   window.cambiarCantidad = function(arg1, arg2) {
     // llamado como cambiarCantidad(delta) desde producto.html
