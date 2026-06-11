@@ -1,0 +1,28 @@
+#CalzadoNica Sistema Railway
+
+##Acciones
+
+Borrar clientes por ID
+-DELETE FROM clientes WHERE id = TU_ID_DE_CLIENTE;
+
+Borrar clientes por correo
+-DELETE FROM clientes WHERE email = TU_CORREO_DE_CLIENTE;
+
+Borrar clientes por nombre
+-DELETE FROM clientes WHERE nombre = TU_NOMBRE_DE_CLIENTE;
+
+Borrar productos por ID
+-DELETE FROM productos WHERE id = TU_ID_DE_PRODUCTO;
+
+Borrar productos por nombre
+-DELETE FROM productos WHERE nombre = TU_NOMBRE_DE_PRODUCTO;
+
+Borrar pedidos por ID
+-DELETE FROM pedidos WHERE id = TU_ID_DE_PEDIDO;
+
+Borrar pedidos por cliente
+-DELETE FROM pedidos WHERE cliente_id = TU_ID_DE_CLIENTE;
+
+Borrar pedidos por producto
+-DELETE FROM pedidos WHERE producto_id = TU_ID_DE_PRODUCTO;
+

@@ -127,7 +127,7 @@ function showLogin() {
     $("#app").fadeOut(200);
     $("#loginModal").fadeIn(200);
     // Evitar registro público desde la interfaz administrativa: solo administradores pueden crear usuarios.
-    $("#showRegisterLink").hide();
+    $("#showRegisterLink").show();
 }
 
 /**
@@ -244,12 +244,21 @@ function handleRegister(e) {
         .then(res => {
             if (res && res.success) {
                 showNotification('Usuario creado. Revisa tu correo para el código.', 'success');
-                hideRegister();
+                // En lugar de volver al login, pasamos al modal de verificación
+                $("#registerModal").fadeOut(150);
+                $("#verify-usernameOrEmail").val(email || username);
+                $("#verifyModal").fadeIn(150);
             } else {
-                $("#registerError").removeClass('hidden').text(res.message || 'Error al registrar');
+                $("#registerError").removeClass('hidden').text('Servidor dice: ' + (res.message || 'Error desconocido'));
+                $btn.prop('disabled', false).text('Registrarme');
             }
         })
-        .fail(() => { $("#registerError").removeClass('hidden').text('Error de conexión'); })
+        .fail((xhr) => {
+            console.error('Error en registro:', xhr);
+            const msg = (xhr && xhr.responseJSON && xhr.responseJSON.message) 
+                || 'Error de red: El servidor de Railway tardó demasiado o no responde.';
+            $("#registerError").removeClass('hidden').text(msg); 
+        })
         .always(() => $btn.prop('disabled', false).text('Registrarme'));
 }
 

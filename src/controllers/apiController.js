@@ -6,15 +6,17 @@ const { JWT_SECRET, EMAIL } = require('../config');
 
 const transporter = nodemailer.createTransport({
   host: EMAIL.host,
-  port: EMAIL.port,
-  secure: false,
+  port: parseInt(EMAIL.port) || 465,
+  secure: parseInt(EMAIL.port) === 465 || parseInt(EMAIL.port) === undefined,
   auth: {
     user: EMAIL.user,
     pass: EMAIL.pass
   },
-  requireTLS: true,
+  connectionTimeout: 5000,
+  greetingTimeout: 5000,
   tls: {
-    rejectUnauthorized: false
+    rejectUnauthorized: false,
+    minVersion: 'TLSv1.2'
   }
 });
 
@@ -243,6 +245,32 @@ async function updateCliente(req, res) {
   } catch (error) {
     console.error('UPDATE CLIENTE ERROR:', error);
     res.status(500).json({ success: false, message: 'Error al actualizar cliente' });
+  }
+}
+
+async function deleteCliente(req, res) {
+  const { id, email } = req.query;
+  if (!id && !email) {
+    return res.status(400).json({ success: false, message: 'ID o Email de cliente requerido' });
+  }
+
+  try {
+    // Buscamos al cliente primero para obtener su ID real
+    const where = id ? { id: Number(id) } : { email: String(email) };
+    const cliente = await prisma.clientes.findFirst({ where });
+
+    if (!cliente) {
+      return res.status(404).json({ success: false, message: 'Cliente no encontrado' });
+    }
+
+    // Primero eliminamos las direcciones asociadas para evitar errores de integridad referencial
+    await prisma.direcciones.deleteMany({ where: { cliente_id: cliente.id } });
+    
+    await prisma.clientes.delete({ where: { id: cliente.id } });
+    res.json({ success: true, message: 'Cliente y sus direcciones eliminados correctamente' });
+  } catch (error) {
+    console.error('DELETE CLIENTE ERROR:', error);
+    res.status(500).json({ success: false, message: 'Error al eliminar el cliente' });
   }
 }
 
@@ -1106,5 +1134,6 @@ module.exports = {
   deleteFactura,
   getStats,
   getClientes,
-  updateCliente
+  updateCliente,
+  deleteCliente
 };

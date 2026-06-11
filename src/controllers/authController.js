@@ -16,22 +16,28 @@ const nodemailer = require('nodemailer');
 // Configuración del transporte de correo para envío de Tokens
 const transporter = nodemailer.createTransport({
   host: EMAIL.host,
-  port: EMAIL.port,
-  secure: false,
+  port: parseInt(EMAIL.port || 587),
+  secure: parseInt(EMAIL.port) === 465, 
   auth: {
     user: EMAIL.user,
     pass: EMAIL.pass
   },
-  requireTLS: true,
+  connectionTimeout: 10000, // 10 segundos para conectar
+  greetingTimeout: 10000,   // 10 segundos para el saludo SMTP
+  socketTimeout: 15000,     // 15 segundos de inactividad
+  debug: false,             // Cambiar a true si persiste el error para ver logs detallados
   tls: {
-    rejectUnauthorized: false
+    rejectUnauthorized: false,
+    minVersion: 'TLSv1.2'
   }
 });
 
 // Verificar conexión SMTP al iniciar y registrar posibles errores
 transporter.verify()
-  .then(() => console.info('[MAIL] Conexión SMTP verificada correctamente'))
-  .catch(err => console.error('[MAIL] Error verificando conexión SMTP:', err));
+  .then(() => console.info(`[MAIL] Conexión SMTP verificada correctamente (${EMAIL.host}:${EMAIL.port})`))
+  .catch(err => {
+    console.error(`[MAIL] Error de conexión SMTP a ${EMAIL.host}:${EMAIL.port}. Verifica tus variables en Railway. Detalle:`, err.message);
+  });
 
 /**
  * Lógica de inicio de sesión.
@@ -184,8 +190,8 @@ async function register(req, res, next) {
           html: `<p>Tu token de verificación es:</p><pre style="font-family: monospace; background:#f4f4f4; padding:10px; border-radius:6px; overflow-x:auto;">${verificationToken}</pre>`
         });
       } catch (mailErr) {
-        console.error('MAIL ERROR:', mailErr);
-        return next({ status: 500, message: 'Cuenta creada, pero fallo al enviar email' });
+        console.error('[MAIL_ERROR] Detalle técnico al registrar:', mailErr.message);
+        return next({ status: 500, message: 'Cuenta creada, pero hubo un error al enviar el correo. Revisa los logs del servidor.' });
       }
 
       return res.status(201).json({ success: true, message: 'Cuenta creada. Revisa tu correo para el token de verificación.' });
@@ -233,7 +239,7 @@ async function register(req, res, next) {
         html: `<p>Tu token de verificación es:</p><pre style="font-family: monospace; background:#f4f4f4; padding:10px; border-radius:6px; overflow-x:auto;">${verificationToken}</pre>`
       });
     } catch (mailErr) {
-      console.error('MAIL ERROR:', mailErr);
+      console.error('[MAIL_ERROR] Detalle técnico en registro admin:', mailErr.message);
       return next({ status: 500, message: 'Usuario creado, pero fallo al enviar email' });
     }
 
@@ -331,8 +337,8 @@ async function resendToken(req, res, next) {
           html: `<p>Tu token de verificación es:</p><pre style="font-family: monospace; background:#f4f4f4; padding:10px; border-radius:6px; overflow-x:auto;">${verificationToken}</pre>`
         });
       } catch (mailErr) {
-        console.error('MAIL ERROR:', mailErr);
-        return next({ status: 500, message: 'Error al reenviar el correo de verificación' });
+        console.error('[MAIL_ERROR] Fallo al reenviar a cliente:', mailErr.message);
+        return next({ status: 500, message: 'Error al reenviar el correo de verificación. Verifica la configuración SMTP.' });
       }
       // En modo debug, devolver también el token en la respuesta para pruebas locales
       if (process.env.DEBUG_RESEND === 'true' || process.env.NODE_ENV === 'development') {
