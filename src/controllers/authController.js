@@ -16,28 +16,19 @@ const nodemailer = require('nodemailer');
 // Configuración del transporte de correo para envío de Tokens
 const transporter = nodemailer.createTransport({
   host: EMAIL.host,
-  port: parseInt(EMAIL.port || 587),
-  secure: parseInt(EMAIL.port) === 465, 
+  port: parseInt(EMAIL.port) || 587,
+  secure: parseInt(EMAIL.port) === 465,
   auth: {
     user: EMAIL.user,
     pass: EMAIL.pass
   },
-  connectionTimeout: 10000, // 10 segundos para conectar
-  greetingTimeout: 10000,   // 10 segundos para el saludo SMTP
-  socketTimeout: 15000,     // 15 segundos de inactividad
-  debug: false,             // Cambiar a true si persiste el error para ver logs detallados
+  connectionTimeout: 5000, 
+  greetingTimeout: 5000,
   tls: {
     rejectUnauthorized: false,
     minVersion: 'TLSv1.2'
   }
 });
-
-// Verificar conexión SMTP al iniciar y registrar posibles errores
-transporter.verify()
-  .then(() => console.info(`[MAIL] Conexión SMTP verificada correctamente (${EMAIL.host}:${EMAIL.port})`))
-  .catch(err => {
-    console.error(`[MAIL] Error de conexión SMTP a ${EMAIL.host}:${EMAIL.port}. Verifica tus variables en Railway. Detalle:`, err.message);
-  });
 
 /**
  * Lógica de inicio de sesión.

@@ -220,6 +220,8 @@ function hideVerify() {
 function handleRegister(e) {
     e.preventDefault();
     const username = $("#reg-username").val().trim();
+    const nombres = $("#reg-nombres").val().trim();
+    const apellidos = $("#reg-apellidos").val().trim();
     const email = $("#reg-email").val().trim();
     const password = $("#reg-password").val();
     if (!username || !email || !password) {
@@ -235,7 +237,7 @@ function handleRegister(e) {
     const direccion = $("#reg-direccion").val() ? $("#reg-direccion").val().trim() : '';
     const guardarDireccion = $("#reg-guardarDireccion").is(':checked');
 
-    const payload = { username, email, password };
+    const payload = { username, email, password, nombres, apellidos };
     if (direccion || provincia || ciudad) {
         payload.direccion = { provincia, ciudad, direccion, predeterminada: !!guardarDireccion };
     }
