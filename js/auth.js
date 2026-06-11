@@ -198,24 +198,57 @@ function handleLogout(e) {
 // --- Registro y verificación ---
 function showRegister() {
     $("#loginModal").fadeOut(150);
-    $("#registerModal").fadeIn(150);
+    $("#registerModal").removeClass('hidden').fadeIn(150);
 }
 
 function hideRegister() {
-    $("#registerModal").fadeOut(150);
-    $("#loginModal").fadeIn(150);
+    $("#registerModal").fadeOut(150, function() {
+        $(this).addClass('hidden');
+    });
+    $("#loginModal").removeClass('hidden').fadeIn(150);
 }
 
 function showVerify() {
     $("#loginModal").fadeOut(150);
-    $("#verifyModal").fadeIn(150);
+    $("#verifyModal").removeClass('hidden').fadeIn(150);
 }
 
 function hideVerify() {
-    $("#verifyModal").fadeOut(150);
-    $("#registerModal").fadeOut(150);
-    $("#loginModal").fadeIn(150);
+    $("#verifyModal").fadeOut(150, function() {
+        $(this).addClass('hidden');
+    });
+    $("#registerModal").fadeOut(150, function() {
+        $(this).addClass('hidden');
+    });
+    $("#loginModal").removeClass('hidden').fadeIn(150);
 }
+
+/**
+ * Transitions from the register modal to the verify modal after successful
+ * registration. Clears any stale token input, pre-fills the email/username,
+ * and ensures the Tailwind `hidden` class is removed before fading in so the
+ * modal is not blocked by `display: none !important`.
+ *
+ * @param {string} emailOrUsername - The email (or username fallback) to pre-fill.
+ */
+function openVerifyModalFromRegister(emailOrUsername) {
+    // Clear stale data from a previous verification attempt
+    $("#verify-token").val('');
+    $("#verifyError").addClass('hidden').text('');
+
+    // Pre-fill the identifier field
+    $("#verify-usernameOrEmail").val(emailOrUsername || '');
+
+    // Fade out the register modal, then reveal the verify modal once the
+    // animation completes so both modals are never visible simultaneously.
+    $("#registerModal").fadeOut(200, function() {
+        $(this).addClass('hidden');
+        $("#verifyModal").removeClass('hidden').hide().fadeIn(200);
+    });
+}
+
+// Expose globally so it can be called from outside this module if needed
+window.openVerifyModalFromRegister = openVerifyModalFromRegister;
 
 function handleRegister(e) {
     e.preventDefault();
@@ -246,10 +279,9 @@ function handleRegister(e) {
         .then(res => {
             if (res && res.success) {
                 showNotification('Usuario creado. Revisa tu correo para el código.', 'success');
-                // En lugar de volver al login, pasamos al modal de verificación
-                $("#registerModal").fadeOut(150);
-                $("#verify-usernameOrEmail").val(email || username);
-                $("#verifyModal").fadeIn(150);
+                // Transition to the verify modal, using the dedicated helper so
+                // the Tailwind `hidden` class is properly removed before fadeIn.
+                openVerifyModalFromRegister(email || username);
             } else {
                 $("#registerError").removeClass('hidden').text('Servidor dice: ' + (res.message || 'Error desconocido'));
                 $btn.prop('disabled', false).text('Registrarme');
