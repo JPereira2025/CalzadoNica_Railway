@@ -246,6 +246,29 @@ async function updateCliente(req, res) {
   }
 }
 
+async function deleteCliente(req, res) {
+  const id = req.query.id ? Number(req.query.id) : null;
+
+  if (!id) {
+    return res.status(400).json({ success: false, message: 'ID requerido' });
+  }
+
+  try {
+    const cliente = await prisma.clientes.findUnique({ where: { id } });
+    if (!cliente) {
+      return res.status(404).json({ success: false, message: 'Cliente no encontrado' });
+    }
+
+    await prisma.direcciones.deleteMany({ where: { cliente_id: id } });
+    await prisma.clientes.delete({ where: { id } });
+
+    res.json({ success: true, message: 'Cliente eliminado' });
+  } catch (error) {
+    console.error('DELETE CLIENTE ERROR:', error);
+    res.status(500).json({ success: false, message: 'Error al eliminar cliente' });
+  }
+}
+
 async function createUsuario(req, res) {
   const { username, email, password, role, verified } = req.body;
 
@@ -1106,5 +1129,6 @@ module.exports = {
   deleteFactura,
   getStats,
   getClientes,
-  updateCliente
+  updateCliente,
+  deleteCliente
 };
