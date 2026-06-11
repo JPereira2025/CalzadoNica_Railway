@@ -23,8 +23,10 @@ const transporter = nodemailer.createTransport({
     user: EMAIL.user,
     pass: EMAIL.pass
   },
-  connectionTimeout: 10000,
-  socketTimeout: 10000,
+  connectionTimeout: 20000,
+  greetingTimeout: 20000,
+  socketTimeout: 20000,
+  family: 4, // Forzar IPv4 para evitar timeouts en Railway
   tls: {
     rejectUnauthorized: false,
     minVersion: 'TLSv1.2'
