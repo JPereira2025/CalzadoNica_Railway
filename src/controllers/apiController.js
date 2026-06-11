@@ -6,14 +6,15 @@ const { JWT_SECRET, EMAIL } = require('../config');
 
 const transporter = nodemailer.createTransport({
   host: EMAIL.host,
-  port: parseInt(EMAIL.port) || 465,
-  secure: parseInt(EMAIL.port) === 465 || parseInt(EMAIL.port) === undefined,
+  port: parseInt(EMAIL.port) || 587,
+  secure: parseInt(EMAIL.port) === 465,
+  requireTLS: parseInt(EMAIL.port) !== 465,
   auth: {
     user: EMAIL.user,
     pass: EMAIL.pass
   },
-  connectionTimeout: 5000,
-  greetingTimeout: 5000,
+  connectionTimeout: 10000,
+  socketTimeout: 10000,
   tls: {
     rejectUnauthorized: false,
     minVersion: 'TLSv1.2'
