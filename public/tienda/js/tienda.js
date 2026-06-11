@@ -1146,6 +1146,7 @@
   window.handleVerifyStore = handleVerifyStore;
   window.resendTokenStore = resendTokenStore;
   window.openVerifyModalFromLogin = openVerifyModalFromLogin;
+  window.openVerifyModalFromRegister = openVerifyModalFromRegister;
   // Exponer aplicarDescuento para botones inline (ej. carrito)
   window.aplicarDescuento = function() { return window.tienda.aplicarDescuento(); };
   // Exponer quitarDescuento
