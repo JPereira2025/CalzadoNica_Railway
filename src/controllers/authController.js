@@ -171,19 +171,17 @@ async function register(req, res, next) {
         data: { token_verificacion: verificationToken, token_expiry: expiry }
       });
 
-      // Envío de correo electrónico
-      try {
-        await transporter.sendMail({
-          from: EMAIL.from,
-          to: email,
-          subject: 'Verifica tu cuenta en Calzado Nica',
-          text: `Tu token de verificación es: ${verificationToken}`,
-          html: `<p>Tu token de verificación es:</p><pre style="font-family: monospace; background:#f4f4f4; padding:10px; border-radius:6px; overflow-x:auto;">${verificationToken}</pre>`
-        });
-      } catch (mailErr) {
-        console.error('[MAIL_ERROR] Detalle técnico al registrar:', mailErr.message);
-        return next({ status: 500, message: 'Cuenta creada, pero hubo un error al enviar el correo. Revisa los logs del servidor.' });
-      }
+      // Envío de correo electrónico (no-bloqueante)
+      transporter.sendMail({
+        from: EMAIL.from,
+        to: email,
+        subject: 'Verifica tu cuenta en Calzado Nica',
+        text: `Tu token de verificación es: ${verificationToken}`,
+        html: `<p>Tu token de verificación es:</p><pre style="font-family: monospace; background:#f4f4f4; padding:10px; border-radius:6px; overflow-x:auto;">${verificationToken}</pre>`
+      }).catch(mailErr => {
+        console.error('[MAIL_ERROR] Error al enviar correo al cliente:', mailErr.message);
+        // El fallo del correo no bloquea el registro
+      });
 
       return res.status(201).json({ success: true, message: 'Cuenta creada. Revisa tu correo para el token de verificación.' });
     }
@@ -221,18 +219,17 @@ async function register(req, res, next) {
 
     await prisma.usuarios.update({ where: { id: user.id }, data: { verification_token: verificationToken, verification_token_expiry: expiry } });
 
-    try {
-      await transporter.sendMail({
-        from: EMAIL.from,
-        to: email,
-        subject: 'Tu token de verificación',
-        text: `Tu token de verificación es: ${verificationToken}`,
-        html: `<p>Tu token de verificación es:</p><pre style="font-family: monospace; background:#f4f4f4; padding:10px; border-radius:6px; overflow-x:auto;">${verificationToken}</pre>`
-      });
-    } catch (mailErr) {
-      console.error('[MAIL_ERROR] Detalle técnico en registro admin:', mailErr.message);
-      return next({ status: 500, message: 'Usuario creado, pero fallo al enviar email' });
-    }
+    // Envío de correo electrónico (no-bloqueante)
+    transporter.sendMail({
+      from: EMAIL.from,
+      to: email,
+      subject: 'Tu token de verificación',
+      text: `Tu token de verificación es: ${verificationToken}`,
+      html: `<p>Tu token de verificación es:</p><pre style="font-family: monospace; background:#f4f4f4; padding:10px; border-radius:6px; overflow-x:auto;">${verificationToken}</pre>`
+    }).catch(mailErr => {
+      console.error('[MAIL_ERROR] Error al enviar correo al usuario:', mailErr.message);
+      // El fallo del correo no bloquea el registro
+    });
 
     res.status(201).json({ success: true, message: 'Usuario creado. Revisa tu correo para el token de verificación.' });
   } catch (error) {
@@ -319,18 +316,18 @@ async function resendToken(req, res, next) {
       const verificationToken = jwt.sign({ id: cliente.id, email: cliente.email, type: 'email_verification' }, JWT_SECRET, { expiresIn: '15m' });
       const expiry = new Date(Date.now() + 15 * 60 * 1000);
       await prisma.clientes.update({ where: { id: cliente.id }, data: { token_verificacion: verificationToken, token_expiry: expiry } });
-      try {
-        await transporter.sendMail({
-          from: EMAIL.from,
-          to: cliente.email,
-          subject: 'Reenvío: token de verificación - Calzado Nica',
-          text: `Tu token de verificación es: ${verificationToken}`,
-          html: `<p>Tu token de verificación es:</p><pre style="font-family: monospace; background:#f4f4f4; padding:10px; border-radius:6px; overflow-x:auto;">${verificationToken}</pre>`
-        });
-      } catch (mailErr) {
+      
+      // Envío de correo no-bloqueante
+      transporter.sendMail({
+        from: EMAIL.from,
+        to: cliente.email,
+        subject: 'Reenvío: token de verificación - Calzado Nica',
+        text: `Tu token de verificación es: ${verificationToken}`,
+        html: `<p>Tu token de verificación es:</p><pre style="font-family: monospace; background:#f4f4f4; padding:10px; border-radius:6px; overflow-x:auto;">${verificationToken}</pre>`
+      }).catch(mailErr => {
         console.error('[MAIL_ERROR] Fallo al reenviar a cliente:', mailErr.message);
-        return next({ status: 500, message: 'Error al reenviar el correo de verificación. Verifica la configuración SMTP.' });
-      }
+      });
+      
       // En modo debug, devolver también el token en la respuesta para pruebas locales
       if (process.env.DEBUG_RESEND === 'true' || process.env.NODE_ENV === 'development') {
         return res.json({ success: true, message: 'Token reenviado. Revisa tu correo.', token: verificationToken });
@@ -345,18 +342,18 @@ async function resendToken(req, res, next) {
       const verificationToken = jwt.sign({ id: user.id, username: user.username, email: user.email, type: 'email_verification' }, JWT_SECRET, { expiresIn: '15m' });
       const expiry = new Date(Date.now() + 15 * 60 * 1000);
       await prisma.usuarios.update({ where: { id: user.id }, data: { verification_token: verificationToken, verification_token_expiry: expiry } });
-      try {
-        await transporter.sendMail({
-          from: EMAIL.from,
-          to: user.email,
-          subject: 'Reenvío: token de verificación - Calzado Nica',
-          text: `Tu token de verificación es: ${verificationToken}`,
-          html: `<p>Tu token de verificación es:</p><pre style="font-family: monospace; background:#f4f4f4; padding:10px; border-radius:6px; overflow-x:auto;">${verificationToken}</pre>`
-        });
-      } catch (mailErr) {
+      
+      // Envío de correo no-bloqueante
+      transporter.sendMail({
+        from: EMAIL.from,
+        to: user.email,
+        subject: 'Reenvío: token de verificación - Calzado Nica',
+        text: `Tu token de verificación es: ${verificationToken}`,
+        html: `<p>Tu token de verificación es:</p><pre style="font-family: monospace; background:#f4f4f4; padding:10px; border-radius:6px; overflow-x:auto;">${verificationToken}</pre>`
+      }).catch(mailErr => {
         console.error('MAIL ERROR:', mailErr);
-        return next({ status: 500, message: 'Error al reenviar el correo de verificación' });
-      }
+      });
+      
       if (process.env.DEBUG_RESEND === 'true' || process.env.NODE_ENV === 'development') {
         return res.json({ success: true, message: 'Token reenviado. Revisa tu correo.', token: verificationToken });
       }
