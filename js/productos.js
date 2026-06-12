@@ -27,6 +27,13 @@ function setupProductosListeners() {
         }
     });
     $(document).on('submit', '#form-producto', handleProductoSubmit);
+    
+    // También permitir que el botón de la imagen en la tabla abra el modal de edición directamente en la sección de fotos
+    $(document).on('click', '.btn-images-producto', function() {
+        const id = $(this).closest('tr').data('id');
+        openProductoModal(id);
+    });
+
     // listeners para gestionar imágenes
     setupProductImageManagementListeners(); // Nuevo listener para la sección de imágenes en el modal de producto
 }
@@ -84,11 +91,13 @@ function openProductoModal(id = null) {
                     $('#producto-categoria').val(prod.categoria_id);
                     $('#producto-estilo').val(prod.estilo_id);
                 }
+                console.log("[DEBUG] Mostrando sección de imágenes para producto:", id);
                 $('#producto-imagenes-section').removeClass('hidden'); // Mostrar sección de imágenes
                 loadImagesForProductModal(id); // Cargar imágenes existentes
                 openModal('#modal-producto');
             });
         } else {
+            console.log("[DEBUG] Ocultando sección de imágenes (Nuevo Producto)");
             $('#producto-imagenes-section').addClass('hidden'); // Ocultar sección de imágenes para nuevo producto
             $('#producto-imagenes-list').html('<p class="col-span-full text-center text-gray-400 text-sm">No hay imágenes. Haz clic en "Elegir Foto" para comenzar.</p>');
             openModal('#modal-producto');
