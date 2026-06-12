@@ -731,26 +731,30 @@ async function getProductos(req, res) {
 
     const mapped = productos.map(mapProducto);
 
-    // --- LÓGICA DE AGRUPACIÓN PARA VISTA ÚNICA ---
+    // --- LÓGICA DE AGRUPACIÓN MAESTRA (Marca + Modelo) ---
     const grouped = new Map();
     mapped.forEach(p => {
-      // Agrupamos por Marca, Modelo y Color (La combinación que define un "estilo" de zapato)
-      const key = `${p.marca.toLowerCase()}|${p.modelo.toLowerCase()}|${p.color?.toLowerCase() || ''}`;
+      const key = `${p.marca.toLowerCase()}|${p.modelo.toLowerCase()}`;
       
       if (!grouped.has(key)) {
         grouped.set(key, {
           ...p,
           tallas_array: [p.talla],
+          colores_array: p.color ? [p.color] : [],
           stock_total: p.stock,
-          variantes: [{ id: p.id, talla: p.talla, stock: p.stock }] // Guardamos los IDs reales para facturar
+          variantes: [{ id: p.id, talla: p.talla, color: p.color, stock: p.stock }]
         });
       } else {
         const group = grouped.get(key);
         if (!group.tallas_array.includes(p.talla)) group.tallas_array.push(p.talla);
+        if (p.color && !group.colores_array.includes(p.color)) group.colores_array.push(p.color);
+        
         group.stock_total += p.stock;
-        group.variantes.push({ id: p.id, talla: p.talla, stock: p.stock });
-        // Actualizamos los campos de la "posición única"
+        group.variantes.push({ id: p.id, talla: p.talla, color: p.color, stock: p.stock });
+        
+        // Actualizamos textos visuales para la tabla
         group.talla = group.tallas_array.sort((a,b) => a-b).join(', ');
+        group.color = group.colores_array.join(', ');
         group.stock = group.stock_total;
       }
     });
@@ -770,47 +774,42 @@ async function getProductos(req, res) {
 async function createProducto(req, res) {
   const { id, marca, modelo, talla, color, precio, stock, categoria_id, estilo_id } = req.body;
 
-  // Convertimos el string de tallas "38, 39, 40" en un array real [38, 39, 40]
-  const listaTallas = String(talla || '').split(',').map(s => s.trim()).filter(Boolean);
+  // Soportar comas, slashes (/) o punto y coma como separadores para facilitar el ingreso manual
+  const listaTallas = String(talla || '').split(/[,\/\;]+/).map(s => s.trim()).filter(Boolean);
+  const listaColores = String(color || '').split(/[,\/\;]+/).map(s => s.trim()).filter(Boolean);
 
-  if (!id || !marca || !modelo || listaTallas.length === 0 || precio === undefined || stock === undefined) {
+  if (!id || !marca || !modelo || listaTallas.length === 0 || listaColores.length === 0) {
     return res.status(400).json({ success: false, message: 'Faltan campos requeridos para crear producto' });
   }
 
   try {
     const creados = [];
-    
-    // Usamos una transacción para asegurar que se creen todos los números o ninguno
     await prisma.$transaction(async (tx) => {
-      for (const t of listaTallas) {
-        // Creamos un ID único para cada variante: ID_BASE-TALLA (ej: PROD-NI-001-38)
-        // Si solo hay una talla, dejamos el ID limpio.
-        const finalId = listaTallas.length > 1 ? `${id}-${t}` : id;
+      for (const c of listaColores) {
+        for (const t of listaTallas) {
+          // ID Único: IDBASE-COLOR-TALLA (Ej: NIKE-ROJO-38)
+          const colorSlug = c.substring(0,3).toUpperCase();
+          const finalId = `${id}-${colorSlug}-${t}`;
 
-        await tx.productos.create({
-          data: {
-            id: String(finalId),
-            marca: String(marca),
-            modelo: String(modelo),
-            talla: String(t), // Cada registro tiene UNA sola talla real
-            color: color ? String(color) : null,
-            categoria_id: categoria_id ? String(categoria_id) : null,
-            estilo_id: estilo_id ? String(estilo_id) : null,
-            precio: Number(precio),
-            stock: Number(stock) // Se le asigna el stock ingresado a cada número
-          }
-        });
-        creados.push(finalId);
+          await tx.productos.create({
+            data: {
+              id: String(finalId),
+              marca: String(marca),
+              modelo: String(modelo),
+              talla: String(t),
+              color: String(c),
+              categoria_id: categoria_id ? String(categoria_id) : null,
+              estilo_id: estilo_id ? String(estilo_id) : null,
+              precio: Number(precio),
+              stock: Number(stock)
+            }
+          });
+          creados.push(finalId);
+        }
       }
     });
 
-    res.json({ 
-      success: true, 
-      message: listaTallas.length > 1 
-        ? `Se crearon ${listaTallas.length} tallas independientes con stock de ${stock} cada una.` 
-        : 'Producto creado exitosamente.',
-      ids: creados 
-    });
+    res.json({ success: true, message: `Matriz creada: ${creados.length} variantes generadas.`, ids: creados });
   } catch (error) {
     console.error('[CREATE_PRODUCTO_BATCH_ERROR]:', error);
     // Capturar error de ID duplicado (P2002 en Prisma)
