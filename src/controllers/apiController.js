@@ -1,27 +1,11 @@
 const prisma = require('../services/prismaService');
 const { normalizeRole } = require('../utils/role');
 const jwt = require('jsonwebtoken');
-const nodemailer = require('nodemailer');
+const sgMail = require('@sendgrid/mail');
 const { JWT_SECRET, EMAIL } = require('../config');
 
-const transporter = nodemailer.createTransport({
-  host: EMAIL.host,
-  port: parseInt(EMAIL.port) || 587,
-  secure: parseInt(EMAIL.port) === 465,
-  requireTLS: parseInt(EMAIL.port) !== 465,
-  auth: {
-    user: EMAIL.user,
-    pass: EMAIL.pass
-  },
-  connectionTimeout: 20000,
-  greetingTimeout: 20000,
-  socketTimeout: 20000,
-  family: 4, // Forzar IPv4 para evitar timeouts en Railway
-  tls: {
-    rejectUnauthorized: false,
-    minVersion: 'TLSv1.2'
-  }
-});
+// Configurar SendGrid
+sgMail.setApiKey(EMAIL.pass);
 
 const fs = require('fs');
 const path = require('path');
@@ -320,7 +304,7 @@ async function createUsuario(req, res) {
       });
 
       try {
-        await transporter.sendMail({
+        await sgMail.send({
           from: EMAIL.from,
           to: created.email,
           subject: 'Tu token de verificación de Calzado Nica',

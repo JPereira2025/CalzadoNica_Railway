@@ -11,27 +11,9 @@ const argon2 = require('argon2');
 const jwt = require('jsonwebtoken');
 const prisma = require('../services/prismaService');
 const { JWT_SECRET, EMAIL } = require('../config');
-const nodemailer = require('nodemailer');
+const sgMail = require('@sendgrid/mail');
 
-// Configuración del transporte de correo para envío de Tokens
-const transporter = nodemailer.createTransport({
-  host: EMAIL.host,
-  port: parseInt(EMAIL.port) || 587,
-  secure: parseInt(EMAIL.port) === 465,
-  requireTLS: parseInt(EMAIL.port) !== 465,
-  auth: {
-    user: EMAIL.user,
-    pass: EMAIL.pass
-  },
-  connectionTimeout: 20000,
-  greetingTimeout: 20000,
-  socketTimeout: 20000,
-  family: 4, // Forzar IPv4 para evitar timeouts en Railway
-  tls: {
-    rejectUnauthorized: false,
-    minVersion: 'TLSv1.2'
-  }
-});
+sgMail.setApiKey(EMAIL.pass); // EMAIL_PASS debe ser tu API KEY de SendGrid
 
 /**
  * Lógica de inicio de sesión.
@@ -175,7 +157,7 @@ async function register(req, res, next) {
       });
 
       // Envío de correo electrónico (no-bloqueante)
-      transporter.sendMail({
+      sgMail.send({
         from: EMAIL.from,
         to: email,
         subject: 'Verifica tu cuenta en Calzado Nica',
@@ -223,7 +205,7 @@ async function register(req, res, next) {
     await prisma.usuarios.update({ where: { id: user.id }, data: { verification_token: verificationToken, verification_token_expiry: expiry } });
 
     // Envío de correo electrónico (no-bloqueante)
-    transporter.sendMail({
+    sgMail.send({
       from: EMAIL.from,
       to: email,
       subject: 'Tu token de verificación',
@@ -325,7 +307,7 @@ async function resendToken(req, res, next) {
       await prisma.clientes.update({ where: { id: cliente.id }, data: { token_verificacion: verificationToken, token_expiry: expiry } });
       
       // Envío de correo no-bloqueante
-      transporter.sendMail({
+      sgMail.send({
         from: EMAIL.from,
         to: cliente.email,
         subject: 'Reenvío: token de verificación - Calzado Nica',
@@ -355,7 +337,7 @@ async function resendToken(req, res, next) {
       await prisma.usuarios.update({ where: { id: user.id }, data: { verification_token: verificationToken, verification_token_expiry: expiry } });
       
       // Envío de correo no-bloqueante
-      transporter.sendMail({
+      sgMail.send({
         from: EMAIL.from,
         to: user.email,
         subject: 'Reenvío: token de verificación - Calzado Nica',
