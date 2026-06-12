@@ -524,7 +524,22 @@
             </div>
             <div class="quickview-info">
               <h3>${p.marca} ${p.modelo}</h3>
-              <p>${p.categoria_nombre || ''} · Talla ${p.talla} · ${p.color || ''}</p>
+              <p style="color:#666; font-size:0.9rem; margin-bottom:12px;">${p.categoria_nombre || ''}</p>
+              
+              <div style="margin-bottom:15px;">
+                <label style="display:block; font-size:0.7rem; font-weight:700; color:#999; margin-bottom:6px;">TALLAS DISPONIBLES</label>
+                <div style="display:flex; flex-wrap:wrap; gap:6px;">
+                  ${(p.talla || '').split(/[,\/\;]+/).map(t => t.trim()).filter(Boolean).map(t => `<span style="padding:4px 10px; background:#f3f4f6; border-radius:4px; font-size:0.85rem; font-weight:600; color:#374151;">${t}</span>`).join('')}
+                </div>
+              </div>
+
+              <div style="margin-bottom:20px;">
+                <label style="display:block; font-size:0.7rem; font-weight:700; color:#999; margin-bottom:6px;">COLORES</label>
+                <div style="display:flex; flex-wrap:wrap; gap:6px;">
+                  ${(p.color || '').split(/[,\/\;]+/).map(c => c.trim()).filter(Boolean).map(c => `<span style="font-size:0.9rem; color:#1E40AF; font-weight:500;">• ${c}</span>`).join('')}
+                </div>
+              </div>
+
               <p class="price">${formatCurrency(p.precio)}</p>
               <div style="display:flex;gap:8px;align-items:center;margin-top:8px;">
                 <a href="/tienda/producto.html?id=${p.id}" class="btn-detalle">Ver detalle</a>
