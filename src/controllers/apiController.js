@@ -707,6 +707,8 @@ async function getProductos(req, res) {
 
     const mapProducto = prod => ({
       ...prod,
+      precio: prod.precio ? Number(prod.precio) : 0, // Evita error 500 con Decimal
+      stock: prod.stock ? Number(prod.stock) : 0,   // Evita error con BigInt
       categoria_nombre: prod.categoria_id ? categoriaMap.get(prod.categoria_id) || '' : '',
       estilo_nombre: prod.estilo_id ? estiloMap.get(prod.estilo_id) || '' : '',
       imagen_principal: (imagenMap.get(prod.id) && imagenMap.get(prod.id).length)

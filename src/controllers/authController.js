@@ -35,7 +35,7 @@ async function login(req, res, next) {
       return next({ status: 401, message: 'El usuario o correo electrónico no existe' });
     }
 
-    if (user.verified === false) {
+    if (!user.verified) {
       return next({ status: 403, message: 'Esta cuenta aún no ha sido verificada. Revisa tu bandeja de entrada.' });
     }
 

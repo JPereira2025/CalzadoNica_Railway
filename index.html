@@ -109,14 +109,6 @@ body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; overflow-x:
 </div>
 <form id="registerForm" class="space-y-4">
 <div>
-<label class="block text-gray-700 text-sm font-bold mb-2" for="reg-nombres">Nombres</label>
-<input id="reg-nombres" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" required>
-</div>
-<div>
-<label class="block text-gray-700 text-sm font-bold mb-2" for="reg-apellidos">Apellidos</label>
-<input id="reg-apellidos" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" required>
-</div>
-<div>
 <label class="block text-gray-700 text-sm font-bold mb-2" for="reg-username">Usuario</label>
 <input id="reg-username" type="text" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500" required autocomplete="username">
 </div>
@@ -515,9 +507,27 @@ body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; overflow-x:
 <option value="">Seleccionar</option>
 <!-- IMPORTANTE: Los estilos deben ser cargados dinámicamente con JavaScript. 
      Asegúrate de que el 'value' de cada <option> sea el 'id' del estilo y el texto sea el 'nombre'. -->
-</select>
-</div>
-</div>
+            </select>
+        </div>
+    </div>
+
+    <!-- Nueva Sección: Gestión de Imágenes de Productos -->
+    <div id="producto-imagenes-section" class="mt-6 border-t pt-4 hidden">
+        <h4 class="text-lg font-semibold text-gray-800 mb-3"><i class="fas fa-images mr-2 text-indigo-500"></i>Galería del Zapato</h4>
+        <div class="flex items-center gap-4 mb-4">
+            <input type="file" id="producto-nueva-imagen" class="hidden" accept="image/*">
+            <button type="button" onclick="$('#producto-nueva-imagen').click()" class="bg-gray-200 hover:bg-gray-300 text-gray-700 py-2 px-4 rounded-lg transition-colors">
+                <i class="fas fa-plus mr-2"></i>Elegir Foto
+            </button>
+            <button type="button" id="btn-upload-img" class="bg-indigo-600 hover:bg-indigo-700 text-white py-2 px-4 rounded-lg transition-colors hidden">
+                <i class="fas fa-cloud-upload-alt mr-2"></i>Cargar a Servidor
+            </button>
+        </div>
+        <div id="producto-imagenes-list" class="grid grid-cols-2 sm:grid-cols-4 gap-4 bg-gray-50 p-4 rounded-xl border border-dashed border-gray-300 min-h-[120px] items-center">
+            <p class="col-span-full text-center text-gray-400 text-sm">No hay imágenes. Haz clic en "Elegir Foto" para comenzar.</p>
+        </div>
+    </div>
+
 <div class="flex justify-end space-x-3 mt-6">
 <button type="button" class="modal-close bg-gray-300 hover:bg-gray-400 text-gray-800 py-2 px-4 rounded-lg transition-colors">Cancelar</button>
 <button type="submit" class="bg-indigo-600 hover:bg-indigo-700 text-white py-2 px-4 rounded-lg transition-colors">Guardar</button>
