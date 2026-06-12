@@ -679,11 +679,19 @@ async function deleteEstilo(req, res) {
 async function getProductos(req, res) {
   try {
     const { id } = req.query;
-    const [productos, categorias, estilos] = await Promise.all([
-      prisma.productos.findMany(),
-      prisma.categorias.findMany(),
-      prisma.estilos.findMany()
-    ]);
+    
+    // Cargar datos base con manejo de errores para diagnosticar fallos de tabla
+    let productos, categorias, estilos;
+    try {
+      [productos, categorias, estilos] = await Promise.all([
+        prisma.productos.findMany(),
+        prisma.categorias.findMany(),
+        prisma.estilos.findMany()
+      ]);
+    } catch (dbErr) {
+      console.error('[ERROR_DB] No se pudieron cargar las tablas base:', dbErr.message);
+      return res.status(500).json({ success: false, message: 'Error de base de datos: asegúrate de haber sincronizado el esquema (npx prisma db push).' });
+    }
 
     // Cargar imágenes con manejo de errores para evitar 500 si la tabla no existe en la DB
     const productIds = productos.map(p => p.id);
