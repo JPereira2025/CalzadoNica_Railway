@@ -685,20 +685,25 @@ async function getProductos(req, res) {
       prisma.estilos.findMany()
     ]);
 
-    // Cargar imágenes por separado (algunas instalaciones de Prisma usan nombres diferentes)
+    // Cargar imágenes con manejo de errores para evitar 500 si la tabla no existe en la DB
     const productIds = productos.map(p => p.id);
     let imagenes = [];
-    if (productIds.length && prisma.producto_imagenes && typeof prisma.producto_imagenes.findMany === 'function') {
-      imagenes = await prisma.producto_imagenes.findMany({ where: { producto_id: { in: productIds } } });
-    } else if (productIds.length) {
-      // Fallback: consultar directamente la tabla producto_imagenes si el modelo no está expuesto
-      const safeList = productIds.map(id => id.replace(/'/g, "''")).map(id => `'${id}'`).join(',');
-      imagenes = await prisma.$queryRawUnsafe(`SELECT * FROM producto_imagenes WHERE producto_id IN (${safeList})`);
-    } else {
-      imagenes = [];
+    try {
+      if (productIds.length && prisma.producto_imagenes && typeof prisma.producto_imagenes.findMany === 'function') {
+        imagenes = await prisma.producto_imagenes.findMany({ where: { producto_id: { in: productIds } } });
+      } else if (productIds.length) {
+        // Fallback: consultar directamente la tabla producto_imagenes si el modelo no está expuesto
+        const safeList = productIds.map(id => String(id).replace(/'/g, "''")).map(id => `'${id}'`).join(',');
+        imagenes = await prisma.$queryRawUnsafe(`SELECT * FROM producto_imagenes WHERE producto_id IN (${safeList})`);
+      }
+    } catch (imgErr) {
+      console.warn('[WARN] No se pudieron cargar las imágenes de los productos:', imgErr.message);
+      // Si falla la consulta de imágenes, continuamos con una lista vacía para no romper el request
     }
+
     const imagenMap = new Map();
-    for (const img of imagenes) {
+    const safeImagenes = Array.isArray(imagenes) ? imagenes : [];
+    for (const img of safeImagenes) {
       if (!imagenMap.has(img.producto_id)) imagenMap.set(img.producto_id, []);
       imagenMap.get(img.producto_id).push(img);
     }
@@ -713,7 +718,7 @@ async function getProductos(req, res) {
       estilo_nombre: prod.estilo_id ? estiloMap.get(prod.estilo_id) || '' : '',
       imagen_principal: (imagenMap.get(prod.id) && imagenMap.get(prod.id).length)
         ? (imagenMap.get(prod.id).find(im => im.es_principal) || imagenMap.get(prod.id)[0]).url
-        : null
+        : '/tienda/img/sin-imagen.svg' // Fallback: si no hay imagen, devolver la de por defecto
     });
 
     if (id) {
