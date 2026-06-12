@@ -321,7 +321,14 @@ function populateFacturaProductoSelect() {
     const $select = $("#factura-producto-select");
     $select.empty().append('<option value="">-- Seleccione --</option>');
     productos.forEach(p => {
-        if (p.stock > 0) {
+        // Si el producto viene agrupado, desplegamos sus variantes (tallas)
+        if (p.variantes && p.variantes.length) {
+            p.variantes.forEach(v => {
+                if (v.stock > 0) {
+                    $select.append(`<option value="${v.id}" data-precio="${p.precio}">${p.marca} ${p.modelo} [${p.color || ''}] - Talla ${v.talla} (Stock: ${v.stock})</option>`);
+                }
+            });
+        } else if (p.stock > 0) {
             $select.append(`<option value="${p.id}" data-precio="${p.precio}">${p.marca} - ${p.modelo} (Stock: ${p.stock})</option>`);
         }
     });

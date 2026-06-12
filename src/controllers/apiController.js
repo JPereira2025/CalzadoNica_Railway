@@ -729,12 +729,38 @@ async function getProductos(req, res) {
         : '/tienda/img/sin-imagen.svg' // Fallback: si no hay imagen, devolver la de por defecto
     });
 
+    const mapped = productos.map(mapProducto);
+
+    // --- LÓGICA DE AGRUPACIÓN PARA VISTA ÚNICA ---
+    const grouped = new Map();
+    mapped.forEach(p => {
+      // Agrupamos por Marca, Modelo y Color (La combinación que define un "estilo" de zapato)
+      const key = `${p.marca.toLowerCase()}|${p.modelo.toLowerCase()}|${p.color?.toLowerCase() || ''}`;
+      
+      if (!grouped.has(key)) {
+        grouped.set(key, {
+          ...p,
+          tallas_array: [p.talla],
+          stock_total: p.stock,
+          variantes: [{ id: p.id, talla: p.talla, stock: p.stock }] // Guardamos los IDs reales para facturar
+        });
+      } else {
+        const group = grouped.get(key);
+        if (!group.tallas_array.includes(p.talla)) group.tallas_array.push(p.talla);
+        group.stock_total += p.stock;
+        group.variantes.push({ id: p.id, talla: p.talla, stock: p.stock });
+        // Actualizamos los campos de la "posición única"
+        group.talla = group.tallas_array.sort((a,b) => a-b).join(', ');
+        group.stock = group.stock_total;
+      }
+    });
+
     if (id) {
-      const producto = productos.find(prod => prod.id === String(id));
-      return res.json(producto ? mapProducto(producto) : {});
+      const p = mapped.find(prod => prod.id === String(id));
+      return res.json(p || {});
     }
 
-    res.json(productos.map(mapProducto));
+    res.json(Array.from(grouped.values()));
   } catch (error) {
     console.error(error);
     res.status(500).json({ success: false, message: 'Error al listar productos' });
