@@ -21,12 +21,6 @@ app.use(cors());
 app.use(express.json()); // Habilita la lectura de JSON en el body
 app.use(express.urlencoded({ extended: true })); // Habilita la lectura de formularios
 
-// Logging de peticiones
-app.use(morgan(process.env.LOG_FORMAT || 'dev'));
-
-// Control de acceso a la tienda pública (habilitar/inhabilitar vía env)
-app.use(blockTienda);
-
 // Servir un favicon mínimo (SVG) para evitar 404 en requests del navegador
 app.get('/favicon.ico', (req, res) => {
     res.type('image/svg+xml');
@@ -37,17 +31,18 @@ app.get('/favicon.ico', (req, res) => {
     </svg>`);
 });
 
-/** 
- * Configuración de Archivos Estáticos
- */
-// Tienda pública (ya configurada)
+// 1. ARCHIVOS ESTÁTICOS (Prioridad para que cargue rápido el diseño)
 app.use('/tienda', express.static(path.join(__dirname, '..', 'public', 'tienda')));
-
-// WebApp administrativa: Servimos las carpetas necesarias del root de forma estática
 app.use('/js', express.static(path.join(__dirname, '..', 'js')));
 app.use('/images', express.static(path.join(__dirname, '..', 'images')));
 app.use('/css', express.static(path.join(__dirname, '..', 'css'))); // Asegurar CSS si existe
+app.use('/pages', express.static(path.join(__dirname, '..', 'pages'))); // Habilitar módulos de la WebApp
 
+// 2. LOGGING Y SEGURIDAD
+app.use(morgan(process.env.LOG_FORMAT || 'dev'));
+app.use(blockTienda);
+
+// 3. RUTAS DE API
 app.use('/', routes);
 
 // Servir el panel de administración en la ruta raíz '/' explícitamente
