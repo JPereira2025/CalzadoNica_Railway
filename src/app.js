@@ -43,19 +43,33 @@ app.get('/favicon.ico', (req, res) => {
 // Tienda pública (ya configurada)
 app.use('/tienda', express.static(path.join(__dirname, '..', 'public', 'tienda')));
 
-// WebApp administrativa: Servimos las carpetas necesarias del root
+// WebApp administrativa: Servimos las carpetas necesarias del root de forma estática
 app.use('/js', express.static(path.join(__dirname, '..', 'js')));
 app.use('/images', express.static(path.join(__dirname, '..', 'images')));
-
-// Servir el panel de administración en la ruta raíz '/'
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, '..', 'index.html'));
-});
-
-// Si quieres una página informativa en la raíz del API, descomenta lo siguiente:
-// app.get('/', (req, res) => res.send('Calzado Nica API'));
+app.use('/css', express.static(path.join(__dirname, '..', 'css'))); // Asegurar CSS si existe
 
 app.use('/', routes);
+
+// Servir el panel de administración en la ruta raíz '/' explícitamente
+// Se coloca después de las rutas para que no interfiera con endpoints específicos
+app.get('/', (req, res) => {
+    const adminPath = path.resolve(__dirname, '..', 'index.html');
+    res.sendFile(adminPath, (err) => {
+        if (err) {
+            console.error(`[ERROR] No se pudo enviar index.html: ${err.message}`);
+            res.status(404).json({ success: false, message: 'WebApp administrativa no encontrada en el servidor.' });
+        }
+    });
+});
+
+// Manejador de rutas no encontradas (404 personalizado en JSON)
+app.use((req, res) => {
+    res.status(404).json({
+        success: false,
+        message: `La ruta ${req.originalUrl} no existe en este servidor.`,
+        suggestion: 'Si buscas la tienda, ve a /tienda/'
+    });
+});
 
 /**
  * Middleware de Manejo de Errores Global (Estilo Profesor)
