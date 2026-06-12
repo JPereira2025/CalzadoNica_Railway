@@ -36,6 +36,7 @@ app.use('/tienda', express.static(path.join(__dirname, '..', 'public', 'tienda')
 app.use('/js', express.static(path.join(__dirname, '..', 'js')));
 app.use('/images', express.static(path.join(__dirname, '..', 'images')));
 app.use('/css', express.static(path.join(__dirname, '..', 'css'))); // Asegurar CSS si existe
+app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads'))); // Servir imágenes subidas
 app.use('/pages', express.static(path.join(__dirname, '..', 'pages'))); // Habilitar módulos de la WebApp
 
 // 2. LOGGING Y SEGURIDAD

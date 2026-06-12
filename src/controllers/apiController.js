@@ -836,7 +836,7 @@ async function createProducto(req, res) {
     res.json({ success: true, message: `Matriz creada: ${creados.length} variantes generadas.`, ids: creados });
   } catch (error) {
     console.error('[CREATE_PRODUCTO_BATCH_ERROR]:', error);
-    // Capturar error de ID duplicado (P2002 en Prisma)
+    // Capturar errores específicos de Prisma para dar un mensaje más claro al usuario
     if (error.code === 'P2002') {
       return res.status(409).json({ 
         success: false, 
@@ -847,6 +847,10 @@ async function createProducto(req, res) {
   }
 }
 
+// --- UPDATE PRODUCTO ---
+// NOTA: Esta función actualiza una VARIANTE específica.
+// No está diseñada para actualizar un "producto maestro" (Marca+Modelo)
+// Si se intenta actualizar talla o color de una variante, puede causar errores si son parte del ID.
 async function updateProducto(req, res) {
   const { id, marca, modelo, talla, color, precio, stock, categoria_id, estilo_id } = req.body;
   if (!id) {
@@ -856,8 +860,10 @@ async function updateProducto(req, res) {
   const data = {};
   if (marca) data.marca = String(marca);
   if (modelo) data.modelo = String(modelo);
-  if (talla) data.talla = String(talla);
-  if (color !== undefined) data.color = color ? String(color) : null;
+  // No permitir actualizar talla o color directamente si son parte del ID de la variante
+  // Si se necesita cambiar esto, se debe eliminar la variante y crear una nueva.
+  // if (talla) data.talla = String(talla);
+  // if (color !== undefined) data.color = color ? String(color) : null;
   if (precio !== undefined) data.precio = Number(precio);
   if (stock !== undefined) data.stock = Number(stock);
   if (categoria_id !== undefined) data.categoria_id = categoria_id ? String(categoria_id) : null;
@@ -871,8 +877,14 @@ async function updateProducto(req, res) {
     await prisma.productos.update({ where: { id: String(id) }, data });
     res.json({ success: true, message: 'Producto actualizado' });
   } catch (error) {
-    console.error('[UPDATE_PRODUCTO_ERROR]:', error);
-    res.status(500).json({ success: false, message: 'Error al actualizar el producto.' });
+    console.error('[UPDATE_PRODUCTO_ERROR]:', error); // Log completo del error
+    if (error.code === 'P2002') { // Unique constraint violation
+      return res.status(409).json({ success: false, message: 'Ya existe un producto con estos datos.' });
+    }
+    if (error.code === 'P2025') { // Record not found
+      return res.status(404).json({ success: false, message: 'Producto no encontrado para actualizar.' });
+    }
+    res.status(500).json({ success: false, message: `Error al actualizar el producto: ${error.message || 'Error desconocido.'}` });
   }
 }
 
