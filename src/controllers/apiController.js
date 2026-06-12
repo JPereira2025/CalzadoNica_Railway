@@ -729,12 +729,45 @@ async function getProductos(req, res) {
         : '/tienda/img/sin-imagen.svg' // Fallback: si no hay imagen, devolver la de por defecto
     });
 
+    const mapped = productos.map(mapProducto);
+
+    // --- LÓGICA DE AGRUPACIÓN MAESTRA (Marca + Modelo) ---
+    const grouped = new Map();
+    mapped.forEach(p => {
+      const key = `${p.marca.toLowerCase()}|${p.modelo.toLowerCase()}`;
+      
+      if (!grouped.has(key)) {
+        grouped.set(key, {
+          ...p,
+          tallas_array: [p.talla],
+          colores_array: p.color ? [p.color] : [],
+          stock_total: p.stock,
+          variantes: [{ id: p.id, talla: p.talla, color: p.color, stock: p.stock }]
+        });
+      } else {
+        const group = grouped.get(key);
+        if (!group.tallas_array.includes(p.talla)) group.tallas_array.push(p.talla);
+        if (p.color && !group.colores_array.includes(p.color)) group.colores_array.push(p.color);
+        
+        group.stock_total += p.stock;
+        group.variantes.push({ id: p.id, talla: p.talla, color: p.color, stock: p.stock });
+        
+        // Actualizamos textos visuales para la tabla
+        group.talla = group.tallas_array.sort((a,b) => a-b).join(', ');
+        group.color = group.colores_array.join(', ');
+        group.stock = group.stock_total;
+      }
+    });
+
     if (id) {
-      const producto = productos.find(prod => prod.id === String(id));
-      return res.json(producto ? mapProducto(producto) : {});
+      const target = mapped.find(prod => prod.id === String(id));
+      if (!target) return res.json({});
+      // Devolver el grupo completo (Marca + Modelo) para que la tienda pueda mostrar colores/tallas
+      const key = `${target.marca.toLowerCase()}|${target.modelo.toLowerCase()}`;
+      return res.json(grouped.get(key) || target);
     }
 
-    res.json(productos.map(mapProducto));
+    res.json(Array.from(grouped.values()));
   } catch (error) {
     console.error(error);
     res.status(500).json({ success: false, message: 'Error al listar productos' });
@@ -744,28 +777,52 @@ async function getProductos(req, res) {
 async function createProducto(req, res) {
   const { id, marca, modelo, talla, color, precio, stock, categoria_id, estilo_id } = req.body;
 
-  if (!id || !marca || !modelo || !talla || precio === undefined || stock === undefined) {
+  // Soportar comas, slashes (/) o punto y coma como separadores para facilitar el ingreso manual
+  const listaTallas = String(talla || '').split(/[,\/\;]+/).map(s => s.trim()).filter(Boolean);
+  const listaColores = String(color || '').split(/[,\/\;]+/).map(s => s.trim()).filter(Boolean);
+
+  if (!id || !marca || !modelo || listaTallas.length === 0 || listaColores.length === 0) {
     return res.status(400).json({ success: false, message: 'Faltan campos requeridos para crear producto' });
   }
 
   try {
-    const producto = await prisma.productos.create({
-      data: {
-        id: String(id),
-        marca: String(marca),
-        modelo: String(modelo),
-        talla: String(talla),
-        color: color ? String(color) : null,
-        categoria_id: categoria_id ? String(categoria_id) : null,
-        estilo_id: estilo_id ? String(estilo_id) : null,
-        precio: Number(precio),
-        stock: Number(stock)
+    const creados = [];
+    await prisma.$transaction(async (tx) => {
+      for (const c of listaColores) {
+        for (const t of listaTallas) {
+          // ID Único: IDBASE-COLOR-TALLA (Ej: NIKE-ROJO-38)
+          const colorSlug = c.substring(0,3).toUpperCase();
+          const finalId = `${id}-${colorSlug}-${t}`;
+
+          await tx.productos.create({
+            data: {
+              id: String(finalId),
+              marca: String(marca),
+              modelo: String(modelo),
+              talla: String(t),
+              color: String(c),
+              categoria_id: categoria_id ? String(categoria_id) : null,
+              estilo_id: estilo_id ? String(estilo_id) : null,
+              precio: Number(precio),
+              stock: Number(stock)
+            }
+          });
+          creados.push(finalId);
+        }
       }
     });
-    res.json({ success: true, message: 'Producto creado', id: producto.id });
+
+    res.json({ success: true, message: `Matriz creada: ${creados.length} variantes generadas.`, ids: creados });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ success: false, message: 'Error al crear producto' });
+    console.error('[CREATE_PRODUCTO_BATCH_ERROR]:', error);
+    // Capturar errores específicos de Prisma para dar un mensaje más claro al usuario
+    if (error.code === 'P2002') {
+      return res.status(409).json({ 
+        success: false, 
+        message: `Error: Algunos de estos registros ya existen (posible duplicidad de ID o talla).` 
+      });
+    }
+    res.status(500).json({ success: false, message: 'Error al procesar el lote de productos.' });
   }
 }
 

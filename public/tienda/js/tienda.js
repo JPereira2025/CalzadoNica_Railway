@@ -524,22 +524,7 @@
             </div>
             <div class="quickview-info">
               <h3>${p.marca} ${p.modelo}</h3>
-              <p style="color:#666; font-size:0.9rem; margin-bottom:12px;">${p.categoria_nombre || ''}</p>
-              
-              <div style="margin-bottom:15px;">
-                <label style="display:block; font-size:0.7rem; font-weight:700; color:#999; margin-bottom:6px;">TALLAS DISPONIBLES</label>
-                <div style="display:flex; flex-wrap:wrap; gap:6px;">
-                  ${(p.talla || '').split(/[,\/\;]+/).map(t => t.trim()).filter(Boolean).map(t => `<span style="padding:4px 10px; background:#f3f4f6; border-radius:4px; font-size:0.85rem; font-weight:600; color:#374151;">${t}</span>`).join('')}
-                </div>
-              </div>
-
-              <div style="margin-bottom:20px;">
-                <label style="display:block; font-size:0.7rem; font-weight:700; color:#999; margin-bottom:6px;">COLORES</label>
-                <div style="display:flex; flex-wrap:wrap; gap:6px;">
-                  ${(p.color || '').split(/[,\/\;]+/).map(c => c.trim()).filter(Boolean).map(c => `<span style="font-size:0.9rem; color:#1E40AF; font-weight:500;">• ${c}</span>`).join('')}
-                </div>
-              </div>
-
+              <p>${p.categoria_nombre || ''} · Talla ${p.talla} · ${p.color || ''}</p>
               <p class="price">${formatCurrency(p.precio)}</p>
               <div style="display:flex;gap:8px;align-items:center;margin-top:8px;">
                 <a href="/tienda/producto.html?id=${p.id}" class="btn-detalle">Ver detalle</a>
@@ -588,26 +573,14 @@
   function agregarAlCarrito() {
     if (!currentProduct) return alert('Producto no cargado');
     const cantidad = Number(document.getElementById('cantidad')?.value || 1);
-    
-    // Obtener valores seleccionados de los menús desplegables
-    const colorSel = document.getElementById('color-select');
-    const tallaSel = document.getElementById('talla');
-    const selectedColor = colorSel ? colorSel.value : currentProduct.color;
-    const selectedTalla = tallaSel ? tallaSel.value : currentProduct.talla;
-
-    // Buscar la variante específica (ID real en la base de datos)
-    let variant = currentProduct;
-    if (currentProduct.variantes) {
-      variant = currentProduct.variantes.find(v => v.color === selectedColor && v.talla === selectedTalla) || currentProduct;
-    }
-
+    const selectedTalla = document.getElementById('talla') ? (document.getElementById('talla').value || null) : (currentProduct.talla || null);
     const selectedImage = (currentImages && currentImages[currentImageIndex]) ? currentImages[currentImageIndex] : { id: null, url: currentProduct.imagen_principal || '/tienda/img/sin-imagen.svg' };
     const selectedImageId = selectedImage.id || null;
     const selectedImageUrl = selectedImage.url || currentProduct.imagen_principal || '/tienda/img/sin-imagen.svg';
     const cart = getCart();
-    const found = cart.find(it => it.id === variant.id && (it.imagen_id || null) === selectedImageId);
+    const found = cart.find(it => it.id === currentProduct.id && (it.talla || null) === (selectedTalla || null) && (it.imagen_id || null) === selectedImageId);
     if (found) found.cantidad = Math.min((found.cantidad || 0) + cantidad, 999);
-    else cart.push({ id: variant.id, nombre: `${variant.marca} ${variant.modelo}`, precio: Number(variant.precio), cantidad, imagen: selectedImageUrl, imagen_id: selectedImageId, talla: variant.talla, color: variant.color });
+    else cart.push({ id: currentProduct.id, nombre: `${currentProduct.marca} ${currentProduct.modelo}`, precio: Number(currentProduct.precio), cantidad, imagen: selectedImageUrl, imagen_id: selectedImageId, talla: selectedTalla });
     saveCart(cart);
     actualizarCartCount();
     showToast('Producto agregado al carrito', 'success');
