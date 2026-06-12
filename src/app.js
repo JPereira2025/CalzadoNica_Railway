@@ -40,13 +40,17 @@ app.get('/favicon.ico', (req, res) => {
 /** 
  * Configuración de Archivos Estáticos
  */
+// Tienda pública (ya configurada)
 app.use('/tienda', express.static(path.join(__dirname, '..', 'public', 'tienda')));
 
-// Servidor de archivos raíz (index.html, assets, etc)
-// No servir la raíz del proyecto desde el servidor Node: evitamos que
-// `http://localhost:3001/` muestre la WebApp administrativa (que debe
-// seguir siendo servida por Apache en http://localhost/CalzadoNica/).
-// Servimos únicamente la tienda pública en `/tienda` (arriba) y la API.
+// WebApp administrativa: Servimos las carpetas necesarias del root
+app.use('/js', express.static(path.join(__dirname, '..', 'js')));
+app.use('/images', express.static(path.join(__dirname, '..', 'images')));
+
+// Servir el panel de administración en la ruta raíz '/'
+app.get('/', (req, res) => {
+    res.sendFile(path.join(__dirname, '..', 'index.html'));
+});
 
 // Si quieres una página informativa en la raíz del API, descomenta lo siguiente:
 // app.get('/', (req, res) => res.send('Calzado Nica API'));
