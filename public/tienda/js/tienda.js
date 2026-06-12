@@ -7,6 +7,7 @@
  * - Procesamiento de pedidos y autenticación de clientes.
  */
 (function () {
+  console.log('tienda.js v2 loaded');
   const CART_KEY = 'cn_cart';
   let currentProduct = null;
   let currentImages = []; // ahora array de objetos { id, url, es_principal }
@@ -16,6 +17,13 @@
   let allEstilos = [];
   let currentDiscount = null;
   const IVA_RATE = 0.15;
+  const SHIPPING_BASE = 100;
+  const SHIPPING_STEP_KM = 5;
+  const SHIPPING_STEP_COST = 50;
+  const STORE_LOCATION = { lat: 12.1470, lng: -86.2650 }; // Ajusta estas coordenadas a la ubicación real de la tienda
+  let userLocation = null;
+  let shippingDistanceKm = null;
+  let shippingCost = SHIPPING_BASE;
 
   function getCart() {
     try { return JSON.parse(localStorage.getItem(CART_KEY)) || []; } catch { return []; }
@@ -42,6 +50,88 @@
 
   function formatCurrency(n) {
     return `C$ ${Number(n).toFixed(2)}`;
+  }
+
+  function calculateShippingCost(distanceKm) {
+    if (typeof distanceKm !== 'number' || Number.isNaN(distanceKm) || distanceKm <= 0) return SHIPPING_BASE;
+    if (distanceKm <= SHIPPING_STEP_KM) return SHIPPING_BASE;
+    const extraKm = distanceKm - SHIPPING_STEP_KM;
+    const extraSteps = Math.ceil(extraKm / SHIPPING_STEP_KM);
+    return SHIPPING_BASE + extraSteps * SHIPPING_STEP_COST;
+  }
+
+  function getDistanceKm(a, b) {
+    if (!a || !b || typeof a.lat !== 'number' || typeof a.lng !== 'number' || typeof b.lat !== 'number' || typeof b.lng !== 'number') return null;
+    const toRad = deg => deg * Math.PI / 180;
+    const R = 6371;
+    const dLat = toRad(b.lat - a.lat);
+    const dLng = toRad(b.lng - a.lng);
+    const lat1 = toRad(a.lat);
+    const lat2 = toRad(b.lat);
+    const hav = Math.sin(dLat / 2) ** 2 + Math.sin(dLng / 2) ** 2 * Math.cos(lat1) * Math.cos(lat2);
+    const c = 2 * Math.atan2(Math.sqrt(hav), Math.sqrt(1 - hav));
+    return Number((R * c).toFixed(2));
+  }
+
+  function refreshCheckoutTotal() {
+    const cart = getCart();
+    const subtotal = cart.reduce((s, i) => s + (Number(i.precio) * Number(i.cantidad || 0)), 0);
+    const descuentoMonto = currentDiscount ? (subtotal * (currentDiscount.porcentaje / 100)) : 0;
+    const base = subtotal - descuentoMonto;
+    const iva = Number((base * IVA_RATE).toFixed(2));
+    const total = Number((base + iva + shippingCost).toFixed(2));
+    const ivaEl = document.getElementById('resumen-iva');
+    const totalEl = document.getElementById('resumen-total');
+    if (ivaEl) ivaEl.textContent = formatCurrency(iva);
+    if (totalEl) totalEl.textContent = formatCurrency(total);
+  }
+
+  function updateShippingSummary(distanceKm, cost, message) {
+    if (typeof cost === 'number') shippingCost = cost;
+    shippingDistanceKm = typeof distanceKm === 'number' ? distanceKm : null;
+    const statusEl = document.getElementById('shipping-status');
+    const distanceEl = document.getElementById('shipping-distance');
+    const costEl = document.getElementById('resumen-shipping');
+    if (statusEl) statusEl.textContent = message || 'Distancia calculada desde la tienda.';
+    if (distanceEl) distanceEl.textContent = (typeof shippingDistanceKm === 'number')
+      ? `Distancia estimada: ${shippingDistanceKm.toFixed(1)} km`
+      : 'Distancia estimada: no disponible';
+    if (costEl) costEl.textContent = formatCurrency(shippingCost);
+    refreshCheckoutTotal();
+  }
+
+  function initShipping() {
+    if (!navigator.geolocation) {
+      updateShippingSummary(null, SHIPPING_BASE, 'No se pudo acceder a la ubicación del cliente. Se aplica costo base de envío.');
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(position => {
+      userLocation = { lat: position.coords.latitude, lng: position.coords.longitude };
+      if (STORE_LOCATION && typeof STORE_LOCATION.lat === 'number' && typeof STORE_LOCATION.lng === 'number') {
+        const distance = getDistanceKm(STORE_LOCATION, userLocation);
+        const cost = calculateShippingCost(distance);
+        updateShippingSummary(distance, cost);
+      } else {
+        updateShippingSummary(null, SHIPPING_BASE, 'Ubicación de la tienda no configurada. Se aplica costo base de envío.');
+      }
+    }, () => {
+      updateShippingSummary(null, SHIPPING_BASE, 'No se pudo determinar la ubicación del cliente. Se aplica costo base de envío.');
+    }, { enableHighAccuracy: false, timeout: 8000, maximumAge: 60000 });
+  }
+
+  function updateDeliveryMethod() {
+    const deliveryType = document.querySelector('input[name="modo_entrega"]:checked')?.value || 'envio';
+    const direccionSection = document.getElementById('direccion-section');
+    const shippingInfo = document.querySelector('.shipping-info');
+    if (deliveryType === 'retiro') {
+      if (direccionSection) direccionSection.style.display = 'none';
+      if (shippingInfo) shippingInfo.style.display = 'none';
+      updateShippingSummary(null, 0, 'Retiro en tienda: no se aplica costo de envío.');
+    } else {
+      if (direccionSection) direccionSection.style.display = '';
+      if (shippingInfo) shippingInfo.style.display = '';
+      initShipping();
+    }
   }
 
   /**
@@ -135,6 +225,8 @@
       let hoverImgs = null;
       let hoverIndex = 0;
       const imgEl = card.querySelector('.producto-imagen');
+      imgEl.style.cursor = 'pointer';
+      imgEl.onclick = async (ev) => { ev.stopPropagation(); await showQuickView(p.id); };
       const prevBtn = document.createElement('button');
       prevBtn.className = 'card-prev'; prevBtn.type = 'button'; prevBtn.innerHTML = '‹';
       const nextBtn = document.createElement('button');
@@ -170,8 +262,16 @@
 
   function buscarProductos() {
     const q = document.getElementById('filtro-busqueda')?.value?.toLowerCase() || '';
-    const filtered = allProducts.filter(p => (`${p.marca} ${p.modelo} ${p.categoria_nombre} ${p.estilo_nombre} ${p.color}`).toLowerCase().includes(q));
-    renderProductos(filtered);
+    const cat = document.getElementById('filtro-categoria')?.value || '';
+    const est = document.getElementById('filtro-estilo')?.value || '';
+    const orden = document.getElementById('filtro-orden')?.value || 'recientes';
+    let lista = allProducts.slice();
+    if (cat) lista = lista.filter(p => p.categoria_id === String(cat));
+    if (est) lista = lista.filter(p => p.estilo_id === String(est));
+    if (q) lista = lista.filter(p => (`${p.marca} ${p.modelo} ${p.categoria_nombre} ${p.estilo_nombre} ${p.color}`).toLowerCase().includes(q));
+    if (orden === 'precio-asc') lista.sort((a,b)=>Number(a.precio)-Number(b.precio));
+    if (orden === 'precio-desc') lista.sort((a,b)=>Number(b.precio)-Number(a.precio));
+    renderProductos(lista);
   }
 
   async function cargarDetalleProducto(id) {
@@ -191,13 +291,20 @@
         const tallaSel = document.getElementById('talla');
         if (tallaSel) {
           tallaSel.innerHTML = '<option value="">Selecciona talla</option>';
-          // si la API devuelve array de tallas usarlo, sino usar p.talla como única opción
-          const tallas = Array.isArray(p.tallas) && p.tallas.length ? p.tallas : (p.talla ? [p.talla] : []);
+          // si la API devuelve array de tallas usarlo; si viene como cadena con varias tallas, parsearlas
+          const rawTallas = Array.isArray(p.tallas) && p.tallas.length ? p.tallas : (p.talla ? [p.talla] : []);
+          const tallas = rawTallas.reduce((acc, raw) => {
+            if (typeof raw !== 'string') return acc;
+            raw.split(/[,;\/\s]+/).map(t => t.trim()).filter(Boolean).forEach(t => {
+              if (!acc.includes(t)) acc.push(t);
+            });
+            return acc;
+          }, []);
           tallas.forEach(t => {
             const opt = document.createElement('option'); opt.value = t; opt.textContent = t; tallaSel.appendChild(opt);
           });
-          // seleccionar la talla por defecto si existe
-          if (p.talla) tallaSel.value = String(p.talla);
+          // seleccionar la talla por defecto solo si hay una única talla disponible
+          if (tallas.length === 1) tallaSel.value = String(tallas[0]);
         }
       } catch (e) { /* noop */ }
       // preparar carrusel
@@ -389,15 +496,103 @@
     container.addEventListener('pointerleave', () => { isDown = false; });
   }
 
+  // Vista rápida a media pantalla (quick view)
+  async function showQuickView(productId) {
+    try {
+      const res = await fetch(`/api/productos?id=${encodeURIComponent(productId)}`);
+      const p = await res.json();
+      if (!p || !p.id) return;
+      // cargar imágenes
+      let imgs = [];
+      try {
+        const imgsRes = await fetch(`/api/productos/${encodeURIComponent(productId)}/imagenes`);
+        imgs = await imgsRes.json();
+      } catch (e) { imgs = []; }
+
+      const existing = document.getElementById('quickview-overlay');
+      if (existing) existing.remove();
+      const overlay = document.createElement('div');
+      overlay.id = 'quickview-overlay';
+      overlay.className = 'quickview-overlay';
+      overlay.innerHTML = `
+        <div class="quickview-panel">
+          <button class="quickview-close">×</button>
+          <div class="quickview-body">
+            <div class="quickview-media">
+              <img id="quickview-main-img" src="${(imgs && imgs[0] && imgs[0].url) || p.imagen_principal || '/tienda/img/sin-imagen.svg'}" />
+              <div class="quickview-thumbs">${(imgs && imgs.length) ? imgs.map((im, i) => `<img data-idx="${i}" src="${im.url}" />`).join('') : ''}</div>
+            </div>
+            <div class="quickview-info">
+              <h3>${p.marca} ${p.modelo}</h3>
+              <p>${p.categoria_nombre || ''} · Talla ${p.talla} · ${p.color || ''}</p>
+              <p class="price">${formatCurrency(p.precio)}</p>
+              <div style="display:flex;gap:8px;align-items:center;margin-top:8px;">
+                <a href="/tienda/producto.html?id=${p.id}" class="btn-detalle">Ver detalle</a>
+                <button id="quickview-volver" class="btn-volver-tienda" type="button">Volver a la tienda</button>
+              </div>
+            </div>
+          </div>
+        </div>`;
+      document.body.appendChild(overlay);
+
+      // inject minimal styles once
+      if (!document.getElementById('quickview-styles')) {
+        const s = document.createElement('style'); s.id = 'quickview-styles'; s.textContent = `
+          .quickview-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.45);display:flex;align-items:center;justify-content:center;z-index:9999}
+          .quickview-panel{background:#fff;width:85%;max-width:980px;border-radius:8px;overflow:hidden}
+          .quickview-close{position:absolute;right:10px;top:6px;border:none;background:transparent;font-size:28px;cursor:pointer}
+          .quickview-body{display:flex;gap:12px;padding:18px}
+          .quickview-media{flex:1}
+          .quickview-media img{width:100%;height:auto;border-radius:6px}
+          .quickview-thumbs{display:flex;gap:8px;margin-top:8px}
+          .quickview-thumbs img{width:64px;height:64px;object-fit:cover;cursor:pointer;border-radius:6px}
+          .quickview-info{width:320px}
+          .quickview-info .price{font-weight:800;margin-top:8px}
+        `; document.head.appendChild(s);
+      }
+
+      overlay.querySelector('.quickview-close').onclick = () => overlay.remove();
+      const mainImg = overlay.querySelector('#quickview-main-img');
+      overlay.querySelectorAll('.quickview-thumbs img').forEach(img => img.addEventListener('click', (ev) => {
+        const idx = Number(img.getAttribute('data-idx'));
+        if (imgs && imgs[idx]) mainImg.src = imgs[idx].url;
+      }));
+      // click en imagen abre lightbox completo
+      mainImg.onclick = () => {
+        overlay.remove();
+        if (imgs && imgs.length) {
+          currentImages = imgs.map(i=>({ id:i.id, url:i.url }));
+          openLightbox(0);
+        }
+      };
+      const volverBtn = overlay.querySelector('#quickview-volver');
+      if (volverBtn) volverBtn.onclick = () => { overlay.remove(); window.location.href = '/tienda/'; };
+    } catch (err) { console.error('quickview error', err); }
+  }
+
   function agregarAlCarrito() {
     if (!currentProduct) return alert('Producto no cargado');
     const cantidad = Number(document.getElementById('cantidad')?.value || 1);
-    const selectedTalla = document.getElementById('talla') ? (document.getElementById('talla').value || null) : (currentProduct.talla || null);
+    
+    // Obtener valores seleccionados de los menús desplegables
+    const colorSel = document.getElementById('color-select');
+    const tallaSel = document.getElementById('talla');
+    const selectedColor = colorSel ? colorSel.value : currentProduct.color;
+    const selectedTalla = tallaSel ? tallaSel.value : currentProduct.talla;
+
+    // Buscar la variante específica (ID real en la base de datos)
+    let variant = currentProduct;
+    if (currentProduct.variantes) {
+      variant = currentProduct.variantes.find(v => v.color === selectedColor && v.talla === selectedTalla) || currentProduct;
+    }
+
+    const selectedImage = (currentImages && currentImages[currentImageIndex]) ? currentImages[currentImageIndex] : { id: null, url: currentProduct.imagen_principal || '/tienda/img/sin-imagen.svg' };
+    const selectedImageId = selectedImage.id || null;
+    const selectedImageUrl = selectedImage.url || currentProduct.imagen_principal || '/tienda/img/sin-imagen.svg';
     const cart = getCart();
-    // try to find same product + same talla to aggregate quantities
-    const found = cart.find(it => it.id === currentProduct.id && (it.talla || null) === (selectedTalla || null));
+    const found = cart.find(it => it.id === variant.id && (it.imagen_id || null) === selectedImageId);
     if (found) found.cantidad = Math.min((found.cantidad || 0) + cantidad, 999);
-    else cart.push({ id: currentProduct.id, nombre: `${currentProduct.marca} ${currentProduct.modelo}`, precio: Number(currentProduct.precio), cantidad, imagen: currentProduct.imagen_principal || '/tienda/img/sin-imagen.svg', talla: selectedTalla });
+    else cart.push({ id: variant.id, nombre: `${variant.marca} ${variant.modelo}`, precio: Number(variant.precio), cantidad, imagen: selectedImageUrl, imagen_id: selectedImageId, talla: variant.talla, color: variant.color });
     saveCart(cart);
     actualizarCartCount();
     showToast('Producto agregado al carrito', 'success');
@@ -623,14 +818,15 @@
       abrirModal('login');
       return;
     }
-    const nombres = document.getElementById('nombres').value;
-    const apellidos = document.getElementById('apellidos').value;
-    const email = document.getElementById('email').value;
-    const telefono = document.getElementById('telefono').value;
-    const provincia = document.getElementById('provincia').value;
-    const ciudad = document.getElementById('ciudad').value;
-    const direccion_exacta = document.getElementById('direccion_exacta').value;
+    const nombres = document.getElementById('nombres').value.trim();
+    const apellidos = document.getElementById('apellidos').value.trim();
+    const email = document.getElementById('email').value.trim();
+    const telefono = document.getElementById('telefono').value.trim();
+    const provincia = document.getElementById('provincia').value.trim();
+    const ciudad = document.getElementById('ciudad').value.trim();
+    const direccion_exacta = document.getElementById('direccion_exacta').value.trim();
     const metodo_pago = document.getElementById('metodo_pago').value;
+    const tipo_entrega = document.querySelector('input[name="modo_entrega"]:checked')?.value || 'envio';
     // recoger detalles de pago según método
     let pago_detalles = null;
     if (metodo_pago === 'transferencia') {
@@ -656,8 +852,13 @@
       }
       pago_detalles = { tipo: 'billetera_movil', numero: num, codigo: codigo, titular: nombre };
     }
-    if (!nombres || !apellidos || !email || !telefono || !provincia || !ciudad || !direccion_exacta || !metodo_pago) {
+    if (!nombres || !apellidos || !email || !telefono || !metodo_pago) {
       document.getElementById('checkout-error').textContent = 'Complete todos los campos requeridos';
+      document.getElementById('checkout-error').style.display = '';
+      return;
+    }
+    if (tipo_entrega === 'envio' && (!provincia || !ciudad || !direccion_exacta)) {
+      document.getElementById('checkout-error').textContent = 'Complete los datos de envío para entrega a domicilio';
       document.getElementById('checkout-error').style.display = '';
       return;
     }
@@ -667,7 +868,8 @@
     const descuentoMonto = currentDiscount ? (subtotal * (currentDiscount.porcentaje / 100)) : 0;
     const base = subtotal - descuentoMonto;
     const iva = Number((base * IVA_RATE).toFixed(2));
-    const total = Number((base + iva).toFixed(2));
+    const shippingCostToUse = tipo_entrega === 'retiro' ? 0 : (typeof shippingCost === 'number' ? shippingCost : SHIPPING_BASE);
+    const total = Number((base + iva + shippingCostToUse).toFixed(2));
     // No generar ID de factura en cliente; el servidor debe asignarla para garantizar consistencia
     const payload = {
       cliente: `${nombres} ${apellidos} <${email}>`,
@@ -675,14 +877,20 @@
       items: items.map(it => ({ id: it.id, nombre: it.nombre, cantidad: it.cantidad, precio: it.precio, talla: it.talla })),
       subtotal,
       monto_descuento: Number(descuentoMonto.toFixed(2)),
+      descuento_porcentaje: currentDiscount ? currentDiscount.porcentaje : 0,
       iva,
+      shipping_cost: shippingCostToUse,
+      shipping_distance_km: shippingDistanceKm !== null ? Number(shippingDistanceKm.toFixed(2)) : null,
+      tipo_entrega,
+      provincia: tipo_entrega === 'envio' ? provincia : null,
+      ciudad: tipo_entrega === 'envio' ? ciudad : null,
+      direccion_exacta: tipo_entrega === 'envio' ? direccion_exacta : null,
       total,
       codigo_descuento: currentDiscount ? currentDiscount.id : null,
       metodo_pago,
       pago_detalles
     };
-
-    const btn = document.getElementById('btn-confirmar');
+    const btn = e.target?.querySelector('button[type="submit"]');
     if (btn) { btn.disabled = true; btn.textContent = 'Procesando...'; }
     try {
       // Actualizar el perfil del cliente con los datos ingresados en el checkout para "guiñar" futuras facturas
@@ -727,7 +935,10 @@
   }
 
   function mostrarConfirmacion(facturaId) {
-    const main = document.querySelector('main.container');
+    const main = document.querySelector('main.container') || document.querySelector('main');
+    const user = JSON.parse(localStorage.getItem('cn_user') || 'null');
+    const loggedIn = user && (user.username || user.email);
+    console.log('mostrarConfirmacion', { facturaId, loggedIn, user });
     if (!main) return alert('Pedido confirmado: ' + facturaId);
     main.innerHTML = `
       <div class="pedido-confirmado">
@@ -735,7 +946,10 @@
         <h1>Pedido confirmado</h1>
         <p>Gracias, su pedido fue registrado correctamente.</p>
         <div class="pedido-numero">${facturaId}</div>
-        <a href="/tienda/" class="btn-continuar-comprando">Volver a la tienda</a>
+        <div class="pedido-acciones">
+          <a href="/tienda/" class="btn-continuar-comprando">${loggedIn ? 'Seguir comprando' : 'Volver a la tienda'}</a>
+          ${loggedIn ? '<button type="button" class="btn-logout" onclick="logout()">Salir y cerrar sesión</button>' : ''}
+        </div>
       </div>`;
   }
 
@@ -774,11 +988,28 @@
     const form = e.target;
     const email = form.querySelector('input[name="email"]').value;
     const password = form.querySelector('input[name="password"]').value;
+    const apiBase = (window.API_BASE || '').replace(/\/$/, '');
     try {
-      const res = await fetch('/tienda/login', { method: 'POST', headers: { 'Content-Type':'application/json' }, body: JSON.stringify({ username: email, password }) });
+      const res = await fetch((apiBase || '') + '/tienda/login', { method: 'POST', headers: { 'Content-Type':'application/json' }, body: JSON.stringify({ username: email, password }) });
       const data = await res.json();
       if (!res.ok || !data.success) {
+        if (typeof abrirModal === 'function') abrirModal('login');
         const el = document.getElementById('login-error'); if (el) { el.textContent = data.message || 'Error autenticando'; el.style.display = 'block'; }
+        showToast(data.message || 'Error autenticando', 'error');
+        if (data.verificationPending) {
+          const verifyModal = document.getElementById('verify-modal-store');
+          const inputUser = document.getElementById('verify-usernameOrEmail-store');
+          const errVerify = document.getElementById('verify-error-store');
+          const verifyInstructions = document.getElementById('verify-instructions');
+          if (inputUser) inputUser.value = email;
+          if (verifyModal) verifyModal.classList.add('active');
+          if (verifyInstructions) {
+            verifyInstructions.textContent = data.tokenExpired
+              ? 'Tu token expiró. Solicita reenvío del token y úsalo para verificar tu cuenta.'
+              : 'Completa tu token de verificación para activar tu cuenta.';
+          }
+          if (errVerify) { errVerify.textContent = data.message || 'Cuenta no verificada'; errVerify.style.display = 'block'; }
+        }
         return;
       }
       // merge saved address if server didn't return it
@@ -793,7 +1024,7 @@
       localStorage.setItem('cn_user', JSON.stringify(data.user));
       updateAuthUI();
       cerrarModal();
-    } catch (err) { console.error(err); document.getElementById('login-error').textContent = 'Error de red'; }
+    } catch (err) { console.error(err); const el = document.getElementById('login-error'); if (el) { el.textContent = 'Error de red'; el.style.display = 'block'; } }
   }
 
   /**
@@ -940,7 +1171,8 @@
       return false;
     }
     try {
-      const res = await fetch('/resend-token', { method: 'POST', headers: { 'Content-Type':'application/json' }, body: JSON.stringify({ usernameOrEmail }) });
+      const apiBase = (window.API_BASE || '').replace(/\/$/, '');
+      const res = await fetch((apiBase || '') + '/resend-token', { method: 'POST', headers: { 'Content-Type':'application/json' }, body: JSON.stringify({ usernameOrEmail }) });
       const data = await res.json();
       if (!res.ok || !data.success) {
         if (errEl) { errEl.textContent = data.message || 'No se pudo reenviar el token'; errEl.style.display = 'block'; }
@@ -999,10 +1231,10 @@
 
   function updateAuthUI() {
     const user = JSON.parse(localStorage.getItem('cn_user') || 'null');
-    if (user && user.username) {
+    if (user && (user.username || user.email)) {
       document.getElementById('auth-buttons') && (document.getElementById('auth-buttons').style.display = 'none');
       document.getElementById('user-menu') && (document.getElementById('user-menu').style.display = 'flex');
-      document.getElementById('user-name') && (document.getElementById('user-name').textContent = user.username);
+      document.getElementById('user-name') && (document.getElementById('user-name').textContent = user.username || user.email || 'Usuario');
       // si estamos en checkout, mostrar el formulario
       const form = document.getElementById('checkout-form');
       const placeholder = document.getElementById('login-required');
@@ -1039,6 +1271,7 @@
   window.tienda = {
     cargarProductos,
     buscarProductos,
+    applyFilters,
     cargarDetalleProducto,
     agregarAlCarrito,
     actualizarUIcarrito,
@@ -1046,6 +1279,7 @@
     aplicarDescuento,
     inicializarCheckout: function() {
       // proteger en caso de llamadas desde páginas que no contienen elementos de checkout
+      initShipping();
       const resumenItems = document.getElementById('resumen-items');
       if (!resumenItems) return; // nada que hacer fuera del checkout
       const cart = getCart();
@@ -1063,8 +1297,10 @@
       const descuentoMonto = currentDiscount ? (subtotal * (currentDiscount.porcentaje / 100)) : 0;
       const base = subtotal - descuentoMonto;
       const iva = Number((base * IVA_RATE).toFixed(2));
-      const total = Number((base + iva).toFixed(2));
+      const shippingCostToUse = typeof shippingCost === 'number' ? shippingCost : SHIPPING_BASE;
+      const total = Number((base + iva + shippingCostToUse).toFixed(2));
       const subtotalEl = document.getElementById('resumen-subtotal'); if (subtotalEl) subtotalEl.textContent = formatCurrency(subtotal);
+      const shippingEl = document.getElementById('resumen-shipping'); if (shippingEl) shippingEl.textContent = formatCurrency(shippingCostToUse);
       const descuentoRow = document.getElementById('resumen-descuento-row');
       const descuentoEl = document.getElementById('resumen-descuento');
       if (currentDiscount) {
@@ -1086,6 +1322,9 @@
       }
       const ivaEl = document.getElementById('resumen-iva'); if (ivaEl) ivaEl.textContent = formatCurrency(iva);
       const totalEl = document.getElementById('resumen-total'); if (totalEl) totalEl.textContent = formatCurrency(total);
+      const deliveryRadios = document.querySelectorAll('input[name="modo_entrega"]');
+      deliveryRadios.forEach(radio => radio.addEventListener('change', updateDeliveryMethod));
+      updateDeliveryMethod();
       // Bind form
       const form = document.getElementById('checkout-form');
       if (form) form.onsubmit = procesarPedido;
@@ -1136,6 +1375,7 @@
   window.cargarDetalleProducto = function(id) { return window.tienda.cargarDetalleProducto(id); };
   window.actualizarUIcarrito = function() { return window.tienda.actualizarUIcarrito(); };
   window.agregarAlCarrito = function(){ return window.tienda.agregarAlCarrito(); };
+  window.cargarProductos = function(){ return (allProducts && allProducts.length && window.tienda.applyFilters) ? window.tienda.applyFilters() : window.tienda.cargarProductos(); };
   window.buscarProductos = function(){ return window.tienda.buscarProductos(); };
   window.procederAlPago = function(){ return window.tienda.procederAlPago(); };
   // navegación rápida al carrito desde el navbar

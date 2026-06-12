@@ -93,13 +93,34 @@ async function getProductoImagenes(req, res) {
   try {
     const productoId = req.params.id;
     if (!productoId) return res.status(400).json({ success: false, message: 'ID de producto requerido' });
+
+    // Buscar el producto base para saber a qué modelo pertenece
+    const product = await prisma.productos.findUnique({ where: { id: String(productoId) } });
+    if (!product) return res.json([]);
+
+    // Obtener IDs de todas las variantes del mismo modelo (Marca + Modelo)
+    const relatedVariants = await prisma.productos.findMany({
+      where: { marca: product.marca, modelo: product.modelo },
+      select: { id: true }
+    });
+    const variantIds = relatedVariants.map(v => v.id);
+
     let imgs = [];
     if (prisma.producto_imagenes && typeof prisma.producto_imagenes.findMany === 'function') {
-      imgs = await prisma.producto_imagenes.findMany({ where: { producto_id: String(productoId) }, orderBy: { orden: 'asc' } });
+      imgs = await prisma.producto_imagenes.findMany({ 
+        where: { producto_id: { in: variantIds } }, 
+        orderBy: { orden: 'asc' } 
+      });
     } else {
-      imgs = await prisma.$queryRawUnsafe('SELECT * FROM producto_imagenes WHERE producto_id = ? ORDER BY orden ASC', String(productoId));
+      const safeList = variantIds.map(id => String(id).replace(/'/g, "''")).map(id => `'${id}'`).join(',');
+      imgs = await prisma.$queryRawUnsafe(`SELECT * FROM producto_imagenes WHERE producto_id IN (${safeList}) ORDER BY orden ASC`);
     }
-    res.json(imgs || []);
+
+    // Eliminar duplicados si la misma foto se subió a varias tallas
+    const seen = new Set();
+    const uniqueImgs = (imgs || []).filter(img => seen.has(img.url) ? false : seen.add(img.url));
+
+    res.json(uniqueImgs);
   } catch (error) {
     console.error('GET IMAGES ERROR:', error);
     res.status(500).json({ success: false, message: 'Error al listar imágenes' });
@@ -760,8 +781,11 @@ async function getProductos(req, res) {
     });
 
     if (id) {
-      const p = mapped.find(prod => prod.id === String(id));
-      return res.json(p || {});
+      const target = mapped.find(prod => prod.id === String(id));
+      if (!target) return res.json({});
+      // Devolver el grupo completo (Marca + Modelo) para que la tienda pueda mostrar colores/tallas
+      const key = `${target.marca.toLowerCase()}|${target.modelo.toLowerCase()}`;
+      return res.json(grouped.get(key) || target);
     }
 
     res.json(Array.from(grouped.values()));
