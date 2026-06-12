@@ -742,62 +742,35 @@ async function getProductos(req, res) {
 }
 
 async function createProducto(req, res) {
-  const { id, marca, modelo, talla, tallas, color, precio, stock, categoria_id, estilo_id } = req.body;
-  
-  // Validación robusta: permitimos 'talla' (string) o 'tallas' (array)
-  const listaTallas = (Array.isArray(tallas) && tallas.length > 0) 
-    ? tallas 
-    : String(talla || '').split(',').map(s => s.trim()).filter(Boolean);
+  const { id, marca, modelo, talla, color, precio, stock, categoria_id, estilo_id } = req.body;
 
-  if (!id || !marca || !modelo || listaTallas.length === 0 || precio === undefined || stock === undefined) {
+  if (!id || !marca || !modelo || !talla || precio === undefined || stock === undefined) {
     return res.status(400).json({ success: false, message: 'Faltan campos requeridos para crear producto' });
   }
 
   try {
-    const creados = [];
-    
-    // Usamos una transacción para que se creen todos o ninguno (integridad)
-    await prisma.$transaction(async (tx) => {
-      for (const t of listaTallas) {
-        // Si hay múltiples tallas, creamos IDs únicos agregando la talla al final
-        // Ejemplo: PROD-NI-001-38, PROD-NI-001-39...
-        // Si solo hay una talla, mantenemos el ID original para no romper la estética.
-        const finalId = listaTallas.length > 1 ? `${id}-${t}` : id;
-
-        await tx.productos.create({
-          data: {
-            id: String(finalId),
-            marca: String(marca),
-            modelo: String(modelo),
-            talla: String(t), // Ahora cada registro tiene UNA sola talla
-            color: color ? String(color) : null,
-            categoria_id: categoria_id ? String(categoria_id) : null,
-            estilo_id: estilo_id ? String(estilo_id) : null,
-            precio: Number(precio),
-            stock: Number(stock)
-          }
-        });
-        creados.push(finalId);
+    const producto = await prisma.productos.create({
+      data: {
+        id: String(id),
+        marca: String(marca),
+        modelo: String(modelo),
+        talla: String(talla), // Guardamos las tallas como un solo string "38, 39, 40"
+        color: color ? String(color) : null,
+        categoria_id: categoria_id ? String(categoria_id) : null,
+        estilo_id: estilo_id ? String(estilo_id) : null,
+        precio: Number(precio),
+        stock: Number(stock) // Stock total de esta variante de color
       }
     });
 
-    res.json({ 
-      success: true, 
-      message: listaTallas.length > 1 
-        ? `${listaTallas.length} variantes de talla creadas correctamente.` 
-        : 'Producto creado con éxito.', 
-      ids: creados 
-    });
+    res.json({ success: true, message: 'Producto creado exitosamente', id: producto.id });
   } catch (error) {
-    console.error('[CREATE_PRODUCTO_BATCH_ERROR]:', error);
+    console.error('[CREATE_PRODUCTO_ERROR]:', error);
     // Capturar error de ID duplicado (P2002 en Prisma)
     if (error.code === 'P2002') {
-      return res.status(409).json({ 
-        success: false, 
-        message: `Error: Algunos de estos productos (IDs) ya existen. Revisa si ya habías ingresado estas tallas.` 
-      });
+      return res.status(409).json({ success: false, message: `El ID '${id}' ya existe. Prueba con otro o edita el existente.` });
     }
-    res.status(500).json({ success: false, message: 'Error al procesar el ingreso. Verifica que los precios y stock sean números válidos.' });
+    res.status(500).json({ success: false, message: 'Error al crear el producto en el servidor.' });
   }
 }
 

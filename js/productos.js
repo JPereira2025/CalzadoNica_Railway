@@ -118,9 +118,7 @@ function handleProductoSubmit(e) {
     const payload = {
         marca: $('#producto-marca').val(),
         modelo: $('#producto-modelo').val(),
-        // aceptar múltiples tallas separadas por comas
-        talla: $('#producto-talla').val(),
-        tallas: ($('#producto-talla').val() || '').split(',').map(s => s.trim()).filter(Boolean),
+        talla: $('#producto-talla').val(), // Enviamos el string "38, 39, 40" directamente
         color: $('#producto-color').val(),
         precio: parseFloat($('#producto-precio').val()) || 0,
         stock: parseInt($('#producto-stock').val()) || 0,
