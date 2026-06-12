@@ -13,6 +13,9 @@ const morgan = require('morgan');
 
 const app = express();
 
+// Configuración para confiar en el proxy de Railway/Cloudflare (Permite obtener IP real)
+app.set('trust proxy', 1);
+
 // Middlewares globales de utilidad
 app.use(cors());
 app.use(express.json()); // Habilita la lectura de JSON en el body

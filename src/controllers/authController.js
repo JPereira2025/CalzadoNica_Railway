@@ -65,7 +65,7 @@ async function login(req, res, next) {
       try { authenticated = await argon2.verify(user.password, password); } catch (err) { authenticated = false; }
     } else if (await bcrypt.compare(password, user.password)) {
       authenticated = true;
-    } else if (password === user.password) {
+    } else if (process.env.NODE_ENV !== 'production' && password === user.password) {
       // Si es texto plano, autenticamos pero marcamos para actualizar a hash seguro
       authenticated = true;
       needsRehash = true;
@@ -164,10 +164,10 @@ async function register(req, res, next) {
       const verificationToken = jwt.sign(
         { id: cliente.id, email: cliente.email, type: 'email_verification' },
         JWT_SECRET,
-        { expiresIn: '15m' }
+        { expiresIn: '24h' }
       );
 
-      const expiry = new Date(Date.now() + 15 * 60 * 1000);
+      const expiry = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
       await prisma.clientes.update({
         where: { id: cliente.id },
@@ -215,10 +215,10 @@ async function register(req, res, next) {
         type: 'email_verification'
       },
       JWT_SECRET,
-      { expiresIn: '15m' }
+      { expiresIn: '24h' }
     );
 
-    const expiry = new Date(Date.now() + 15 * 60 * 1000); // 15 minutos
+    const expiry = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 horas
 
     await prisma.usuarios.update({ where: { id: user.id }, data: { verification_token: verificationToken, verification_token_expiry: expiry } });
 
@@ -316,8 +316,12 @@ async function resendToken(req, res, next) {
     // intentar encontrar en clientes
     const cliente = await prisma.clientes.findFirst({ where: { email: usernameOrEmail } });
     if (cliente) {
-      const verificationToken = jwt.sign({ id: cliente.id, email: cliente.email, type: 'email_verification' }, JWT_SECRET, { expiresIn: '15m' });
-      const expiry = new Date(Date.now() + 15 * 60 * 1000);
+      const verificationToken = jwt.sign(
+        { id: cliente.id, email: cliente.email, type: 'email_verification' }, 
+        JWT_SECRET, 
+        { expiresIn: '24h' }
+      );
+      const expiry = new Date(Date.now() + 24 * 60 * 60 * 1000);
       await prisma.clientes.update({ where: { id: cliente.id }, data: { token_verificacion: verificationToken, token_expiry: expiry } });
       
       // Envío de correo no-bloqueante
@@ -342,8 +346,12 @@ async function resendToken(req, res, next) {
     const user = await prisma.usuarios.findFirst({ where: { OR: [{ username: usernameOrEmail }, { email: usernameOrEmail }] } });
     if (user) {
       console.info(`[RESEND_TOKEN] Found user id=${user.id} username=${user.username} email=${user.email}`);
-      const verificationToken = jwt.sign({ id: user.id, username: user.username, email: user.email, type: 'email_verification' }, JWT_SECRET, { expiresIn: '15m' });
-      const expiry = new Date(Date.now() + 15 * 60 * 1000);
+      const verificationToken = jwt.sign(
+        { id: user.id, username: user.username, email: user.email, type: 'email_verification' }, 
+        JWT_SECRET, 
+        { expiresIn: '24h' }
+      );
+      const expiry = new Date(Date.now() + 24 * 60 * 60 * 1000);
       await prisma.usuarios.update({ where: { id: user.id }, data: { verification_token: verificationToken, verification_token_expiry: expiry } });
       
       // Envío de correo no-bloqueante
@@ -394,7 +402,7 @@ async function loginStore(req, res, next) {
     } else if (await bcrypt.compare(password, cliente.password)) {
       authenticated = true;
     } else if (password === cliente.password) {
-      authenticated = true;
+      authenticated = process.env.NODE_ENV !== 'production';
       needsRehash = true;
     }
 

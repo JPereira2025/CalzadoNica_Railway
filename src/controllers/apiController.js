@@ -307,10 +307,10 @@ async function createUsuario(req, res) {
           type: 'email_verification'
         },
         JWT_SECRET,
-        { expiresIn: '15m' }
+        { expiresIn: '24h' }
       );
 
-      const expiry = new Date(Date.now() + 15 * 60 * 1000);
+      const expiry = new Date(Date.now() + 24 * 60 * 60 * 1000);
       await prisma.usuarios.update({
         where: { id: created.id },
         data: {
@@ -377,10 +377,10 @@ async function updateUsuario(req, res) {
               type: 'email_verification'
             },
             JWT_SECRET,
-            { expiresIn: '15m' }
+            { expiresIn: '24h' }
           );
           data.verification_token = newToken;
-          data.verification_token_expiry = new Date(Date.now() + 15 * 60 * 1000);
+          data.verification_token_expiry = new Date(Date.now() + 24 * 60 * 60 * 1000);
         }
       }
     }
