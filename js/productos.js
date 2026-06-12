@@ -28,7 +28,7 @@ function setupProductosListeners() {
     });
     $(document).on('submit', '#form-producto', handleProductoSubmit);
     // listeners para gestionar imágenes
-    setupImagesListeners();
+    setupProductImageManagementListeners(); // Nuevo listener para la sección de imágenes en el modal de producto
 }
 
 /**
@@ -58,6 +58,10 @@ function openProductoModal(id = null) {
     $('#modal-producto-title').text(id ? 'Editar Producto' : 'Nuevo Producto');
     $('#producto-id-form').val(id || '');
 
+    // Resetear la sección de imágenes
+    $('#producto-nueva-imagen').val(''); // Limpiar input de archivo
+    $('#btn-upload-img').addClass('hidden'); // Ocultar botón de subir
+
     const categoriasPromise = loadCategoriasForDropdown();
     const estilosPromise = loadEstilosForDropdown();
 
@@ -80,9 +84,13 @@ function openProductoModal(id = null) {
                     $('#producto-categoria').val(prod.categoria_id);
                     $('#producto-estilo').val(prod.estilo_id);
                 }
+                $('#producto-imagenes-section').removeClass('hidden'); // Mostrar sección de imágenes
+                loadImagesForProductModal(id); // Cargar imágenes existentes
                 openModal('#modal-producto');
             });
         } else {
+            $('#producto-imagenes-section').addClass('hidden'); // Ocultar sección de imágenes para nuevo producto
+            $('#producto-imagenes-list').html('<p class="col-span-full text-center text-gray-400 text-sm">No hay imágenes. Haz clic en "Elegir Foto" para comenzar.</p>');
             openModal('#modal-producto');
         }
     }).catch(error => {
@@ -163,97 +171,130 @@ function renderProductoRow(producto) {
     </tr>`;
 }
 
-    // --- Imágenes: handlers y UI ---
-    function setupImagesListeners() {
-        // abrir modal de imágenes
-        $(document).on('click', '.btn-images-producto', function() {
-            const id = $(this).closest('tr').data('id');
-            if (!ensureAdminAction('gestionar imágenes')) return;
-            openImagesModal(id);
-        });
+/**
+ * Configura los listeners para la gestión de imágenes dentro del modal de producto.
+ */
+function setupProductImageManagementListeners() {
+    // Mostrar/ocultar botón de subir al seleccionar archivo
+    $(document).on('change', '#producto-nueva-imagen', function() {
+        if (this.files && this.files[0]) {
+            $('#btn-upload-img').removeClass('hidden');
+        } else {
+            $('#btn-upload-img').addClass('hidden');
+        }
+    });
 
-        // subir imagen
-        $(document).on('submit', '#form-upload-imagen', function(e) {
-            e.preventDefault();
-            const prodId = $('#modal-prod-id').text();
-            const fileEl = document.getElementById('upload-imagen-file');
-            if (!fileEl || !fileEl.files || !fileEl.files.length) {
-                showNotification('Seleccione un archivo', 'error');
-                return;
-            }
-            const fd = new FormData();
-            fd.append('imagen', fileEl.files[0]);
-            fd.append('es_principal', $('#upload-imagen-principal').is(':checked') ? '1' : '0');
-            fd.append('orden', $('#upload-imagen-orden').val() || 0);
+    // Subir imagen al servidor
+    $(document).on('click', '#btn-upload-img', function() {
+        const prodId = $('#producto-id-form').val();
+        if (!prodId) {
+            showNotification('Primero debe guardar el producto para poder subir imágenes.', 'error');
+            return;
+        }
 
-            const token = sessionStorage.getItem('authToken');
-            $.ajax({
-                url: mapEndpoint(`api/productos/${prodId}/imagenes`),
-                method: 'POST',
-                data: fd,
-                processData: false,
-                contentType: false,
-                headers: { 'Authorization': token ? 'Bearer ' + token : '' }
-            }).done(resp => {
-                showNotification('Imagen subida', 'success');
-                $('#upload-imagen-file').val('');
-                loadImagesForProduct(prodId);
-            }).fail((xhr) => {
-                showNotification('Error subiendo imagen', 'error');
-                console.error('Upload error', xhr.responseText || xhr);
-            });
-        });
+        const fileEl = document.getElementById('producto-nueva-imagen');
+        if (!fileEl || !fileEl.files || !fileEl.files.length) {
+            showNotification('Seleccione un archivo para subir', 'error');
+            return;
+        }
 
-        // eliminar imagen
-        $(document).on('click', '.btn-delete-imagen', function() {
-            if (!confirm('¿Eliminar imagen?')) return;
-            const imgId = $(this).data('imgid');
-            const prodId = $('#modal-prod-id').text();
-            const token = sessionStorage.getItem('authToken');
-            $.ajax({ url: mapEndpoint(`api/productos/${prodId}/imagenes/${imgId}`), method: 'DELETE', headers: { 'Authorization': token ? 'Bearer ' + token : '' } })
-            .done(() => { showNotification('Imagen eliminada', 'success'); loadImagesForProduct(prodId); })
-            .fail((xhr) => { showNotification('Error eliminando imagen', 'error'); console.error(xhr.responseText||xhr); });
-        });
+        const fd = new FormData();
+        fd.append('imagen', fileEl.files[0]);
+        // Puedes añadir campos para es_principal y orden si los necesitas en el modal
+        // fd.append('es_principal', '0'); 
+        // fd.append('orden', '0');
 
-        // marcar principal
-        $(document).on('click', '.btn-set-principal', function() {
-            const imgId = $(this).data('imgid');
-            const prodId = $('#modal-prod-id').text();
-            const token = sessionStorage.getItem('authToken');
-            $.ajax({ url: mapEndpoint(`api/productos/${prodId}/imagenes/${imgId}/principal`), method: 'POST', headers: { 'Authorization': token ? 'Bearer ' + token : '' } })
-            .done(() => { showNotification('Imagen marcada como principal', 'success'); loadImagesForProduct(prodId); loadProductos(); })
-            .fail((xhr) => { showNotification('Error marcando principal', 'error'); console.error(xhr.responseText||xhr); });
-        });
-    }
-
-    function openImagesModal(prodId) {
-        $('#modal-prod-id').text(prodId);
-        $('#modal-imagenes-producto').fadeIn(200);
-        loadImagesForProduct(prodId);
-    }
-
-    function loadImagesForProduct(prodId) {
         const token = sessionStorage.getItem('authToken');
-        $.ajax({ url: mapEndpoint(`api/productos/${prodId}/imagenes`), method: 'GET', headers: { 'Authorization': token ? 'Bearer ' + token : '' } })
-        .done((imgs) => {
-            const $list = $('#imagenes-list');
-            $list.empty();
-            if (!imgs || !imgs.length) {
-                $list.append('<div class="col-span-3 text-sm text-gray-600">No hay imágenes.</div>');
-                return;
-            }
-            imgs.forEach(img => {
-                const thumb = `<div class="border p-2 rounded relative">
-                    <img src="${img.url}" class="w-full h-32 object-cover rounded mb-2" />
-                    <div class="flex justify-between gap-2">
-                      <button class="btn-set-principal bg-blue-600 text-white py-1 px-2 rounded text-sm" data-imgid="${img.id}">${img.es_principal? 'Principal' : 'Marcar'}</button>
-                      <button class="btn-delete-imagen bg-red-600 text-white py-1 px-2 rounded text-sm" data-imgid="${img.id}">Eliminar</button>
-                    </div>
-                </div>`;
-                $list.append(thumb);
-            });
-        }).fail((xhr) => { showNotification('Error cargando imágenes', 'error'); console.error(xhr.responseText||xhr); });
-    }
+        $.ajax({
+            url: mapEndpoint(`api/productos/${prodId}/imagenes`),
+            method: 'POST',
+            data: fd,
+            processData: false, // Importante para FormData
+            contentType: false, // Importante para FormData
+            headers: { 'Authorization': token ? 'Bearer ' + token : '' }
+        }).done(resp => {
+            showNotification(resp.message, 'success');
+            $('#producto-nueva-imagen').val(''); // Limpiar input de archivo
+            $('#btn-upload-img').addClass('hidden'); // Ocultar botón de subir
+            loadImagesForProductModal(prodId); // Recargar lista de imágenes
+            loadProductos(); // Para actualizar la imagen principal en la tabla
+        }).fail((xhr) => {
+            showNotification('Error subiendo imagen', 'error');
+            console.error('Upload error', xhr.responseText || xhr);
+        });
+    });
+
+    // Eliminar imagen
+    $(document).on('click', '.btn-delete-imagen-modal', function() {
+        if (!confirm('¿Eliminar esta imagen?')) return;
+        const imgId = $(this).data('imgid');
+        const prodId = $('#producto-id-form').val();
+        const token = sessionStorage.getItem('authToken');
+        $.ajax({
+            url: mapEndpoint(`api/productos/${prodId}/imagenes/${imgId}`),
+            method: 'DELETE',
+            headers: { 'Authorization': token ? 'Bearer ' + token : '' }
+        }).done(() => {
+            showNotification('Imagen eliminada', 'success');
+            loadImagesForProductModal(prodId);
+            loadProductos(); // Para actualizar la imagen principal en la tabla
+        }).fail((xhr) => {
+            showNotification('Error eliminando imagen', 'error');
+            console.error(xhr.responseText || xhr);
+        });
+    });
+
+    // Marcar imagen como principal
+    $(document).on('click', '.btn-set-principal-modal', function() {
+        const imgId = $(this).data('imgid');
+        const prodId = $('#producto-id-form').val();
+        const token = sessionStorage.getItem('authToken');
+        $.ajax({
+            url: mapEndpoint(`api/productos/${prodId}/imagenes/${imgId}/principal`),
+            method: 'POST',
+            headers: { 'Authorization': token ? 'Bearer ' + token : '' }
+        }).done(() => {
+            showNotification('Imagen marcada como principal', 'success');
+            loadImagesForProductModal(prodId);
+            loadProductos(); // Para actualizar la imagen principal en la tabla
+        }).fail((xhr) => {
+            showNotification('Error marcando principal', 'error');
+            console.error(xhr.responseText || xhr);
+        });
+    });
+}
+
+/**
+ * Carga y renderiza las imágenes de un producto en el modal.
+ */
+function loadImagesForProductModal(prodId) {
+    const token = sessionStorage.getItem('authToken');
+    $.ajax({
+        url: mapEndpoint(`api/productos/${prodId}/imagenes`),
+        method: 'GET',
+        headers: { 'Authorization': token ? 'Bearer ' + token : '' }
+    }).done((imgs) => {
+        const $list = $('#producto-imagenes-list');
+        $list.empty();
+        if (!imgs || !imgs.length) {
+            $list.append('<p class="col-span-full text-center text-gray-400 text-sm">No hay imágenes. Haz clic en "Elegir Foto" para comenzar.</p>');
+            return;
+        }
+        imgs.forEach(img => {
+            const thumb = `<div class="border p-2 rounded relative">
+                <img src="${img.url}" class="w-full h-32 object-cover rounded mb-2" />
+                <div class="flex justify-between gap-2">
+                  <button class="btn-set-principal-modal bg-blue-600 text-white py-1 px-2 rounded text-sm" data-imgid="${img.id}">${img.es_principal ? 'Principal' : 'Marcar'}</button>
+                  <button class="btn-delete-imagen-modal bg-red-600 text-white py-1 px-2 rounded text-sm" data-imgid="${img.id}">Eliminar</button>
+                </div>
+            </div>`;
+            $list.append(thumb);
+        });
+    }).fail((xhr) => {
+        showNotification('Error cargando imágenes del producto', 'error');
+        console.error(xhr.responseText || xhr);
+    });
+}
 
 /**
  * Genera ID único para producto
