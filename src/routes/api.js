@@ -74,30 +74,27 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
-router.post('/productos/:id/imagenes', authenticateToken, requireAdmin, upload.single('imagen'), (req, res, next) => {
-  // delegado al controlador para mantener lógica ahí
+// Rutas de imágenes - usar query param ?id= para evitar problemas con caracteres especiales en la ruta
+router.post('/productos/imagenes/upload', authenticateToken, requireAdmin, upload.single('imagen'), (req, res, next) => {
   req.file && (req.file.url = `/tienda/img/${req.file.filename}`);
-  // import controlador dinámicamente para evitar ciclos
   const { uploadProductoImagen } = require('../controllers/apiController');
   return uploadProductoImagen(req, res, next);
 });
 
-// NOTE: debug upload route removed; use authenticated route POST /api/productos/:id/imagenes
-
-// Listar imágenes de un producto (pública)
-router.get('/productos/:id/imagenes', (req, res) => {
+// Listar imágenes de un producto (pública) - query param ?id=
+router.get('/productos/imagenes/list', (req, res) => {
   const { getProductoImagenes } = require('../controllers/apiController');
   return getProductoImagenes(req, res);
 });
 
-// Eliminar imagen
-router.delete('/productos/:id/imagenes/:imgId', authenticateToken, requireAdmin, (req, res) => {
+// Eliminar imagen - query params ?id=&imgId=
+router.delete('/productos/imagenes/delete', authenticateToken, requireAdmin, (req, res) => {
   const { deleteProductoImagen } = require('../controllers/apiController');
   return deleteProductoImagen(req, res);
 });
 
-// Marcar imagen como principal
-router.post('/productos/:id/imagenes/:imgId/principal', authenticateToken, requireAdmin, (req, res) => {
+// Marcar imagen como principal - query params ?id=&imgId=
+router.post('/productos/imagenes/principal', authenticateToken, requireAdmin, (req, res) => {
   const { setPrincipalImagen } = require('../controllers/apiController');
   return setPrincipalImagen(req, res);
 });

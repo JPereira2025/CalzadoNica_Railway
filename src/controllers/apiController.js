@@ -13,7 +13,7 @@ const path = require('path');
 // Upload product image (admin only)
 async function uploadProductoImagen(req, res) {
   try {
-    const productoId = req.params.id;
+    const productoId = req.params.id || req.query.id;
     if (!productoId) return res.status(400).json({ success: false, message: 'ID de producto requerido' });
 
     const producto = await prisma.productos.findUnique({ where: { id: String(productoId) } });
@@ -91,7 +91,7 @@ async function uploadProductoImagen(req, res) {
 // Listar imágenes de un producto (admin)
 async function getProductoImagenes(req, res) {
   try {
-    const productoId = req.params.id;
+    const productoId = req.params.id || req.query.id;
     if (!productoId) return res.status(400).json({ success: false, message: 'ID de producto requerido' });
     let imgs = [];
     if (prisma.producto_imagenes && typeof prisma.producto_imagenes.findMany === 'function') {
@@ -127,8 +127,8 @@ async function getProductoImagenes(req, res) {
 // Eliminar imagen de producto (admin)
 async function deleteProductoImagen(req, res) {
   try {
-    const productoId = req.params.id;
-    const imgId = Number(req.params.imgId);
+    const productoId = req.params.id || req.query.id;
+    const imgId = Number(req.params.imgId || req.query.imgId);
     if (!productoId || !imgId) return res.status(400).json({ success: false, message: 'Producto e imagen requeridos' });
     
     let img = null;
@@ -175,8 +175,8 @@ async function deleteProductoImagen(req, res) {
 // Marcar imagen como principal (admin)
 async function setPrincipalImagen(req, res) {
   try {
-    const productoId = req.params.id;
-    const imgId = Number(req.params.imgId);
+    const productoId = req.params.id || req.query.id;
+    const imgId = Number(req.params.imgId || req.query.imgId);
     if (!productoId || !imgId) return res.status(400).json({ success: false, message: 'Producto e imagen requeridos' });
     // desmarcar otras
     if (prisma.producto_imagenes && typeof prisma.producto_imagenes.updateMany === 'function') {

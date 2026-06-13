@@ -230,7 +230,7 @@ function setupProductImageManagementListeners() {
                 const fd = new FormData();
                 fd.append('imagen', fileEl.files[i]);
                 await $.ajax({
-                    url: mapEndpoint(`api/productos/${prodId}/imagenes`),
+                    url: mapEndpoint(`api/productos/imagenes/upload?id=${encodeURIComponent(prodId)}`),
                     method: 'POST',
                     data: fd,
                     processData: false,
@@ -266,7 +266,7 @@ function setupProductImageManagementListeners() {
         }
         
         $.ajax({
-            url: mapEndpoint(`api/productos/${prodId}/imagenes/${imgId}`),
+            url: mapEndpoint(`api/productos/imagenes/delete?id=${encodeURIComponent(prodId)}&imgId=${imgId}`),
             method: 'DELETE',
             headers: { 
                 'Authorization': token ? 'Bearer ' + token : '',
@@ -292,7 +292,7 @@ function setupProductImageManagementListeners() {
         const prodId = $('#producto-id-form').val();
         const token = sessionStorage.getItem('authToken');
         $.ajax({
-            url: mapEndpoint(`api/productos/${prodId}/imagenes/${imgId}/principal`),
+            url: mapEndpoint(`api/productos/imagenes/principal?id=${encodeURIComponent(prodId)}&imgId=${imgId}`),
             method: 'POST',
             headers: { 'Authorization': token ? 'Bearer ' + token : '' }
         }).done(() => {
@@ -312,7 +312,7 @@ function setupProductImageManagementListeners() {
 function loadImagesForProductModal(prodId) {
     const token = sessionStorage.getItem('authToken');
     $.ajax({
-        url: mapEndpoint(`api/productos/${prodId}/imagenes`),
+        url: mapEndpoint(`api/productos/imagenes/list?id=${encodeURIComponent(prodId)}`),
         method: 'GET',
         headers: { 'Authorization': token ? 'Bearer ' + token : '' }
     }).done((imgs) => {

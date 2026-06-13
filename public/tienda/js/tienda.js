@@ -241,7 +241,7 @@
         if (hoverImgs && hoverImgs.length) return hoverImgs;
         if (hoverCache[p.id]) { hoverImgs = hoverCache[p.id]; return hoverImgs; }
         try {
-          const res = await fetch(`/api/productos/${encodeURIComponent(p.id)}/imagenes`);
+          const res = await fetch(`/api/productos/imagenes/list?id=${encodeURIComponent(p.id)}`);
           const data = await res.json();
           const imgs = Array.isArray(data) ? data.filter(i => i && i.url && !i.url.toLowerCase().endsWith('sin-imagen.svg')) : [];
           if (imgs.length) { hoverImgs = imgs; hoverCache[p.id] = imgs; }
@@ -331,7 +331,7 @@
       currentImageIndex = 0;
       // cargar miniaturas (todas las imágenes del producto)
       try {
-        const imgsRes = await fetch(`/api/productos/${encodeURIComponent(id)}/imagenes`);
+        const imgsRes = await fetch(`/api/productos/imagenes/list?id=${encodeURIComponent(id)}`);
         const imgsData = imgsRes.ok ? await imgsRes.json() : [];
         const imgs = Array.isArray(imgsData) ? imgsData : [];
         const validImgs = imgs.filter(i => i && typeof i.url === 'string' && i.url.trim() && !i.url.toLowerCase().endsWith('sin-imagen.svg'));
@@ -459,7 +459,7 @@
       if (!productoId) return showToast('Producto no cargado', 'error');
       const token = localStorage.getItem('cn_token');
       if (!token) return showToast('Acceso denegado: inicie sesión como admin', 'error');
-      const res = await fetch(`/api/productos/${encodeURIComponent(productoId)}/imagenes/${encodeURIComponent(imgId)}/principal`, {
+      const res = await fetch(`/api/productos/imagenes/principal?id=${encodeURIComponent(productoId)}&imgId=${encodeURIComponent(imgId)}`, {
         method: 'POST', headers: { 'Authorization': `Bearer ${token}` }
       });
       const data = await res.json();
@@ -536,7 +536,7 @@
       // cargar imágenes
       let imgs = [];
       try {
-        const imgsRes = await fetch(`/api/productos/${encodeURIComponent(productId)}/imagenes`);
+        const imgsRes = await fetch(`/api/productos/imagenes/list?id=${encodeURIComponent(productId)}`);
         imgs = await imgsRes.json();
       } catch (e) { imgs = []; }
 
