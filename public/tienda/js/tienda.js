@@ -323,19 +323,21 @@
       // cargar miniaturas (todas las imágenes del producto)
       try {
         const imgsRes = await fetch(`/api/productos/${encodeURIComponent(id)}/imagenes`);
-        const imgs = await imgsRes.json();
+        const imgsData = imgsRes.ok ? await imgsRes.json() : [];
+        const imgs = Array.isArray(imgsData) ? imgsData : [];
+        const validImgs = imgs.filter(i => i && typeof i.url === 'string' && i.url.trim() && !i.url.includes('/tienda/img/sin-imagen.svg') && !i.url.includes('sin-imagen.svg'));
         const miniCont = document.getElementById('miniaturas');
         if (miniCont) {
           miniCont.innerHTML = '';
-          if (imgs && imgs.length) {
+          if (validImgs.length) {
                   // build images array (objetos) y preferir es_principal como inicio
-                  currentImages = imgs.map(i => ({ id: i.id, url: i.url, es_principal: !!i.es_principal }));
+                  currentImages = validImgs.map(i => ({ id: i.id, url: i.url, es_principal: !!i.es_principal }));
                   const principalIdx = currentImages.findIndex(i => i.es_principal);
                   currentImageIndex = principalIdx >= 0 ? principalIdx : 0;
                   // render thumbnails (horizontales) con opción de marcar principal si es admin
                   const user = JSON.parse(localStorage.getItem('cn_user') || 'null');
                   const isAdmin = user && user.role === 'Administrador';
-                  imgs.forEach((img, idx) => {
+                  validImgs.forEach((img, idx) => {
                     const wrapper = document.createElement('div');
                     wrapper.className = 'mini-thumb-wrapper';
                     const b = document.createElement('button');
