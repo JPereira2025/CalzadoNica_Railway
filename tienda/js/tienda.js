@@ -449,8 +449,9 @@
       row.className = 'carrito-item';
       const itemSubtotal = Number(item.precio) * Number(item.cantidad);
       subtotal += itemSubtotal;
+      const itemImageSrc = item.imagen || '/tienda/img/sin-imagen.svg';
       row.innerHTML = `
-        <img src="${item.imagen}" alt="${item.nombre}">
+        <img src="${itemImageSrc}" alt="${item.nombre}" onerror="this.onerror=null;this.src='/tienda/img/sin-imagen.svg';">
         <div class="carrito-item-info">
           <h3>${item.nombre}</h3>
           <p>Precio: ${formatCurrency(item.precio)}</p>

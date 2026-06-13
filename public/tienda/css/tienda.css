@@ -569,11 +569,13 @@ body {
    ======================================== */
 
 .carrito-container {
-  background: linear-gradient(135deg, #0ea5e9 0%, #10b981 100%);
+  background: linear-gradient(135deg, #0ea5e9 0%, #10b981 100%) !important;
+  background-color: #0ea5e9 !important;
+  opacity: 1 !important;
   border-radius: 8px;
-  box-shadow: var(--shadow);
+  box-shadow: var(--shadow) !important;
   padding: 2rem;
-  border: none;
+  border: none !important;
 }
 
 .carrito-header {
