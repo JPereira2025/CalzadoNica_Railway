@@ -11,6 +11,7 @@
   let currentProduct = null;
   let currentImages = []; // ahora array de objetos { id, url, es_principal }
   let currentImageIndex = 0;
+  let detailInterval = null;
   let allProducts = [];
   let allCategorias = [];
   let allEstilos = [];
@@ -118,7 +119,9 @@
       // permitir override local (usuario) para imagen principal
       let localOverrides = {};
       try { localOverrides = JSON.parse(localStorage.getItem('cn_product_primary_overrides') || '{}'); } catch (e) {}
-      const imgSrc = (localOverrides[p.id] && localOverrides[p.id].url) ? localOverrides[p.id].url : (p.imagen_principal || '/tienda/img/sin-imagen.svg');
+      
+      const isPlaceholder = (url) => !url || url.toLowerCase().endsWith('sin-imagen.svg');
+      const imgSrc = (localOverrides[p.id] && localOverrides[p.id].url) ? localOverrides[p.id].url : (!isPlaceholder(p.imagen_principal) ? p.imagen_principal : '/tienda/img/sin-imagen.svg');
       card.innerHTML = `
         <img class="producto-imagen" src="${imgSrc}" alt="${p.marca} ${p.modelo}">
         <div class="producto-info">
@@ -139,6 +142,7 @@
       prevBtn.className = 'card-prev'; prevBtn.type = 'button'; prevBtn.innerHTML = '‹';
       const nextBtn = document.createElement('button');
       nextBtn.className = 'card-next'; nextBtn.type = 'button'; nextBtn.innerHTML = '›';
+      prevBtn.style.display = 'none'; nextBtn.style.display = 'none';
       card.appendChild(prevBtn); card.appendChild(nextBtn);
 
       async function ensureHoverImgs() {
@@ -146,8 +150,9 @@
         if (hoverCache[p.id]) { hoverImgs = hoverCache[p.id]; return hoverImgs; }
         try {
           const res = await fetch(`/api/productos/${encodeURIComponent(p.id)}/imagenes`);
-          const imgs = await res.json();
-          if (Array.isArray(imgs) && imgs.length) { hoverImgs = imgs; hoverCache[p.id] = imgs; }
+          const data = await res.json();
+          const imgs = Array.isArray(data) ? data.filter(i => i && i.url && !i.url.toLowerCase().endsWith('sin-imagen.svg')) : [];
+          if (imgs.length) { hoverImgs = imgs; hoverCache[p.id] = imgs; }
         } catch (e) { /* ignore */ }
         return hoverImgs;
       }
@@ -155,11 +160,15 @@
       card.addEventListener('mouseenter', async () => {
         const imgs = await ensureHoverImgs();
         if (imgs && imgs.length) {
+          if (imgs.length > 1) { prevBtn.style.display = 'flex'; nextBtn.style.display = 'flex'; }
           hoverIndex = 0;
           hoverInterval = setInterval(() => { hoverIndex = (hoverIndex + 1) % imgs.length; imgEl.style.opacity = '0'; setTimeout(()=>{ imgEl.src = imgs[hoverIndex].url; imgEl.style.opacity='1'; },120); }, 3000);
         }
       });
-      card.addEventListener('mouseleave', () => { if (hoverInterval) { clearInterval(hoverInterval); hoverInterval = null; imgEl.src = imgSrc; } });
+      card.addEventListener('mouseleave', () => { 
+        prevBtn.style.display = 'none'; nextBtn.style.display = 'none';
+        if (hoverInterval) { clearInterval(hoverInterval); hoverInterval = null; imgEl.src = imgSrc; } 
+      });
 
       prevBtn.onclick = async (ev) => { ev.stopPropagation(); const imgs = await ensureHoverImgs(); if (imgs && imgs.length) { hoverIndex = (hoverIndex - 1 + imgs.length) % imgs.length; imgEl.src = imgs[hoverIndex].url; } };
       nextBtn.onclick = async (ev) => { ev.stopPropagation(); const imgs = await ensureHoverImgs(); if (imgs && imgs.length) { hoverIndex = (hoverIndex + 1) % imgs.length; imgEl.src = imgs[hoverIndex].url; } };
@@ -270,6 +279,11 @@
             }
             if (validImgs.length > 1) {
               ensureCarouselControls();
+              if (detailInterval) clearInterval(detailInterval);
+              detailInterval = setInterval(() => {
+                currentImageIndex = (currentImageIndex + 1) % currentImages.length;
+                setCurrentImage(currentImageIndex);
+              }, 5000); // Cambia cada 5 segundos
             } else {
               removeCarouselControls();
             }
