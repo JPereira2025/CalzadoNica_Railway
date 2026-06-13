@@ -740,6 +740,11 @@ async function getProductos(req, res) {
       // Filtramos para ignorar CUALQUIER registro de 'sin-imagen.svg'
       const prodImgs = (imagenMap.get(prod.id) || []).filter(img => img && img.url && !img.url.toLowerCase().endsWith('sin-imagen.svg'));
       
+      // Fallback: Si no hay imágenes en la galería, usar el campo de la tabla (si no es placeholder)
+      const tableFallback = (prod.imagen_principal && !prod.imagen_principal.toLowerCase().endsWith('sin-imagen.svg')) 
+        ? prod.imagen_principal 
+        : '/tienda/img/sin-imagen.svg';
+
       return {
         ...prod,
         precio: prod.precio ? Number(prod.precio) : 0,
@@ -748,7 +753,7 @@ async function getProductos(req, res) {
         estilo_nombre: prod.estilo_id ? estiloMap.get(prod.estilo_id) || '' : '',
         imagen_principal: prodImgs.length > 0
           ? (prodImgs.find(im => im.es_principal) || prodImgs[0]).url
-          : '/tienda/img/sin-imagen.svg'
+          : tableFallback
       };
     };
 
@@ -778,6 +783,11 @@ async function getProductos(req, res) {
         group.stock_total += p.stock;
         group.variantes.push({ id: p.id, talla: p.talla, color: p.color, stock: p.stock });
         
+        // Si el grupo tiene imagen placeholder pero esta variante tiene una real, actualizarla
+        if (group.imagen_principal.toLowerCase().endsWith('sin-imagen.svg') && !p.imagen_principal.toLowerCase().endsWith('sin-imagen.svg')) {
+          group.imagen_principal = p.imagen_principal;
+        }
+
         // Actualizamos textos visuales para la tabla
         group.talla = group.tallas_array.sort((a,b) => a-b).join(', ');
         group.color = group.colores_array.join(', ');
@@ -789,7 +799,9 @@ async function getProductos(req, res) {
       const target = mapped.find(prod => prod.id === String(id));
       if (!target) return res.json({});
       // Devolver el grupo completo (Marca + Modelo) para que la tienda pueda mostrar colores/tallas
-      const key = `${target.marca.toLowerCase()}|${target.modelo.toLowerCase()}`;
+      const marcaKey = (target.marca || 'Genérico').toLowerCase();
+      const modeloKey = (target.modelo || 'Sin Modelo').toLowerCase();
+      const key = `${marcaKey}|${modeloKey}`;
       return res.json(grouped.get(key) || target);
     }
 
@@ -889,7 +901,7 @@ async function updateProducto(req, res) {
     if (error.code === 'P2025') { // Record not found
       return res.status(404).json({ success: false, message: 'Producto no encontrado para actualizar.' });
     }
-    res.status(500).json({ success: false, message: `Error al actualizar el producto: ${error.message || 'Error desconocido.'}` });
+    res.status(500).json({ success: false, message: 'Error interno al actualizar el producto.' });
   }
 }
 
