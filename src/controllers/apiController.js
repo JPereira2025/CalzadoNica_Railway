@@ -736,30 +736,38 @@ async function getProductos(req, res) {
     const categoriaMap = new Map(categorias.map(cat => [cat.id, cat.nombre]));
     const estiloMap = new Map(estilos.map(est => [est.id, est.nombre]));
 
-    const mapProducto = prod => ({
-      ...prod,
-      precio: prod.precio ? Number(prod.precio) : 0, // Evita error 500 con Decimal
-      stock: prod.stock ? Number(prod.stock) : 0,   // Evita error con BigInt
-      categoria_nombre: prod.categoria_id ? categoriaMap.get(prod.categoria_id) || '' : '',
-      estilo_nombre: prod.estilo_id ? estiloMap.get(prod.estilo_id) || '' : '',
-      imagen_principal: (imagenMap.get(prod.id) && imagenMap.get(prod.id).length)
-        ? (imagenMap.get(prod.id).find(im => im.es_principal) || imagenMap.get(prod.id)[0]).url
-        : '/tienda/img/sin-imagen.svg' // Fallback: si no hay imagen, devolver la de por defecto
-    });
+    const mapProducto = prod => {
+      // Filtramos para ignorar CUALQUIER registro de 'sin-imagen.svg'
+      const prodImgs = (imagenMap.get(prod.id) || []).filter(img => img && img.url && !img.url.toLowerCase().endsWith('sin-imagen.svg'));
+      
+      return {
+        ...prod,
+        precio: prod.precio ? Number(prod.precio) : 0,
+        stock: prod.stock ? Number(prod.stock) : 0,
+        categoria_nombre: prod.categoria_id ? categoriaMap.get(prod.categoria_id) || '' : '',
+        estilo_nombre: prod.estilo_id ? estiloMap.get(prod.estilo_id) || '' : '',
+        imagen_principal: prodImgs.length > 0
+          ? (prodImgs.find(im => im.es_principal) || prodImgs[0]).url
+          : '/tienda/img/sin-imagen.svg'
+      };
+    };
 
     const mapped = productos.map(mapProducto);
 
     // --- LÓGICA DE AGRUPACIÓN MAESTRA (Marca + Modelo) ---
     const grouped = new Map();
     mapped.forEach(p => {
-      const key = `${p.marca.toLowerCase()}|${p.modelo.toLowerCase()}`;
+      // Safeguard: Si marca o modelo son null, evitamos que el server explote (Error 500)
+      const marca = (p.marca || 'Genérico').toLowerCase();
+      const modelo = (p.modelo || 'Sin Modelo').toLowerCase();
+      const key = `${marca}|${modelo}`;
       
       if (!grouped.has(key)) {
         grouped.set(key, {
           ...p,
           tallas_array: [p.talla],
           colores_array: p.color ? [p.color] : [],
-          stock_total: p.stock,
+          stock_total: Number(p.stock || 0),
           variantes: [{ id: p.id, talla: p.talla, color: p.color, stock: p.stock }]
         });
       } else {
