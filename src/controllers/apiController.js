@@ -762,9 +762,9 @@ async function getProductos(req, res) {
     // --- LÓGICA DE AGRUPACIÓN MAESTRA (Marca + Modelo) ---
     const grouped = new Map();
     mapped.forEach(p => {
-      // Safeguard: Si marca o modelo son null, evitamos que el server explote (Error 500)
-      const marca = (p.marca || 'Genérico').toLowerCase();
-      const modelo = (p.modelo || 'Sin Modelo').toLowerCase();
+      // Limpiamos y normalizamos para evitar que espacios o nulos agrupen productos distintos
+      const marca = String(p.marca || 'Genérico').trim().toLowerCase();
+      const modelo = String(p.modelo || 'Sin Modelo').trim().toLowerCase();
       const key = `${marca}|${modelo}`;
       
       if (!grouped.has(key)) {
@@ -772,7 +772,7 @@ async function getProductos(req, res) {
           ...p,
           tallas_array: [p.talla],
           colores_array: p.color ? [p.color] : [],
-          stock_total: Number(p.stock || 0),
+          stock_total: Math.max(0, Number(p.stock || 0)),
           variantes: [{ id: p.id, talla: p.talla, color: p.color, stock: p.stock }]
         });
       } else {
@@ -780,7 +780,8 @@ async function getProductos(req, res) {
         if (!group.tallas_array.includes(p.talla)) group.tallas_array.push(p.talla);
         if (p.color && !group.colores_array.includes(p.color)) group.colores_array.push(p.color);
         
-        group.stock_total += p.stock;
+        // Forzamos suma numérica para evitar que se concatenen como texto (el error del número gigante)
+        group.stock_total += Math.max(0, Number(p.stock || 0));
         group.variantes.push({ id: p.id, talla: p.talla, color: p.color, stock: p.stock });
         
         // Si el grupo tiene imagen placeholder pero esta variante tiene una real, actualizarla
