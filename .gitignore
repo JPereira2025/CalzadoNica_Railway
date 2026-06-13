@@ -19,6 +19,9 @@ db/*.sql
 /public/tienda/img/*
 !/public/tienda/img/sin-imagen.svg
 !/public/tienda/img/.gitkeep
+!/public/tienda/img/calzado_nica_logo.png
+!/public/tienda/img/logo_bordado.png
+!/public/tienda/img/logo_cuero.png
 
 # Imágenes de tienda folder
 /tienda/img/*
