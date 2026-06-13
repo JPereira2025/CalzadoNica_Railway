@@ -14,3 +14,13 @@ uploads/
 config.php
 db/*.sql
 /src/generated/prisma
+
+# Imágenes de productos (no persistir en git, se perderían en deploys)
+/public/tienda/img/*
+!/public/tienda/img/sin-imagen.svg
+!/public/tienda/img/.gitkeep
+
+# Imágenes de tienda folder
+/tienda/img/*
+!/tienda/img/sin-imagen.svg
+!/tienda/img/.gitkeep

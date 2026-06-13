@@ -15,7 +15,8 @@
     "prisma:generate": "npx prisma generate",
     "prisma:migrate:deploy": "npx prisma migrate deploy",
     "dev:local": "nodemon --watch src --exec \"node src/server.js\"",
-    "dev:railway": "cross-env ENV_PATH=.env.railway NODE_ENV=railway nodemon --watch src --exec \"node src/server.js\""
+    "dev:railway": "cross-env ENV_PATH=.env.railway NODE_ENV=railway nodemon --watch src --exec \"node src/server.js\"",
+    "clean:images": "node scripts/clean-images.js"
   },
   "dependencies": {
     "@prisma/client": "^4.16.2",
