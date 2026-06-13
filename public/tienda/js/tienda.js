@@ -286,25 +286,35 @@
       document.getElementById('producto-precio').textContent = formatCurrency(p.precio);
       document.getElementById('producto-stock').textContent = p.stock > 0 ? 'En stock' : 'Agotado';
       document.getElementById('img-principal').src = p.imagen_principal || '/tienda/img/sin-imagen.svg';
-      // rellenar selector de talla si existe
+      // rellenar selectores de talla y color si existen
       try {
         const tallaSel = document.getElementById('talla');
+        const colorSel = document.getElementById('color');
+        const rawTallas = Array.isArray(p.tallas) && p.tallas.length ? p.tallas : (p.talla ? [p.talla] : []);
+        const tallas = rawTallas.reduce((acc, raw) => {
+          if (typeof raw !== 'string') return acc;
+          raw.split(/[,;\/\s]+/).map(t => t.trim()).filter(Boolean).forEach(t => { if (!acc.includes(t)) acc.push(t); });
+          return acc;
+        }, []);
+        const rawColores = Array.isArray(p.colores_array) && p.colores_array.length ? p.colores_array : (p.color ? [p.color] : []);
+        const colores = rawColores.reduce((acc, raw) => {
+          if (typeof raw !== 'string') return acc;
+          raw.split(/[,;\/]+/).map(c => c.trim()).filter(Boolean).forEach(c => { if (!acc.includes(c)) acc.push(c); });
+          return acc;
+        }, []);
         if (tallaSel) {
           tallaSel.innerHTML = '<option value="">Selecciona talla</option>';
-          // si la API devuelve array de tallas usarlo; si viene como cadena con varias tallas, parsearlas
-          const rawTallas = Array.isArray(p.tallas) && p.tallas.length ? p.tallas : (p.talla ? [p.talla] : []);
-          const tallas = rawTallas.reduce((acc, raw) => {
-            if (typeof raw !== 'string') return acc;
-            raw.split(/[,;\/\s]+/).map(t => t.trim()).filter(Boolean).forEach(t => {
-              if (!acc.includes(t)) acc.push(t);
-            });
-            return acc;
-          }, []);
           tallas.forEach(t => {
             const opt = document.createElement('option'); opt.value = t; opt.textContent = t; tallaSel.appendChild(opt);
           });
-          // seleccionar la talla por defecto solo si hay una única talla disponible
           if (tallas.length === 1) tallaSel.value = String(tallas[0]);
+        }
+        if (colorSel) {
+          colorSel.innerHTML = '<option value="">Selecciona color</option>';
+          colores.forEach(c => {
+            const opt = document.createElement('option'); opt.value = c; opt.textContent = c; colorSel.appendChild(opt);
+          });
+          if (colores.length === 1) colorSel.value = String(colores[0]);
         }
       } catch (e) { /* noop */ }
       // preparar carrusel
@@ -574,13 +584,14 @@
     if (!currentProduct) return alert('Producto no cargado');
     const cantidad = Number(document.getElementById('cantidad')?.value || 1);
     const selectedTalla = document.getElementById('talla') ? (document.getElementById('talla').value || null) : (currentProduct.talla || null);
+    const selectedColor = document.getElementById('color') ? (document.getElementById('color').value || null) : (currentProduct.color || null);
     const selectedImage = (currentImages && currentImages[currentImageIndex]) ? currentImages[currentImageIndex] : { id: null, url: currentProduct.imagen_principal || '/tienda/img/sin-imagen.svg' };
     const selectedImageId = selectedImage.id || null;
     const selectedImageUrl = selectedImage.url || currentProduct.imagen_principal || '/tienda/img/sin-imagen.svg';
     const cart = getCart();
-    const found = cart.find(it => it.id === currentProduct.id && (it.talla || null) === (selectedTalla || null) && (it.imagen_id || null) === selectedImageId);
+    const found = cart.find(it => it.id === currentProduct.id && (it.talla || null) === (selectedTalla || null) && (it.color || null) === (selectedColor || null) && (it.imagen_id || null) === selectedImageId);
     if (found) found.cantidad = Math.min((found.cantidad || 0) + cantidad, 999);
-    else cart.push({ id: currentProduct.id, nombre: `${currentProduct.marca} ${currentProduct.modelo}`, precio: Number(currentProduct.precio), cantidad, imagen: selectedImageUrl, imagen_id: selectedImageId, talla: selectedTalla });
+    else cart.push({ id: currentProduct.id, nombre: `${currentProduct.marca} ${currentProduct.modelo}`, precio: Number(currentProduct.precio), cantidad, imagen: selectedImageUrl, imagen_id: selectedImageId, talla: selectedTalla, color: selectedColor });
     saveCart(cart);
     actualizarCartCount();
     showToast('Producto agregado al carrito', 'success');
@@ -619,7 +630,7 @@
         <div class="carrito-item-info">
           <h3>${item.nombre}</h3>
           <p>Precio: ${formatCurrency(item.precio)}</p>
-          <p>Talla: ${item.talla ? item.talla : '—'}</p>
+          <p>Talla: ${item.talla ? item.talla : '—'} ${item.color ? '· Color: ' + item.color : ''}</p>
         </div>
         <div class="carrito-item-cantidad">
           <button onclick="(function(){ window.tienda.cambiarCantidad('${item.id}', -1); })()">-</button>

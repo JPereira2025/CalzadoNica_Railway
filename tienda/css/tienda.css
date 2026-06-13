@@ -485,6 +485,46 @@ body {
   gap: 1rem;
 }
 
+.selector-variantes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.selector-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.selector-item label {
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.selector-item select {
+  padding: 0.6rem 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font-size: 1rem;
+  background: white;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+
+.selector-item select:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.selector-cantidad {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
 .selector-cantidad button {
   width: 40px;
   height: 40px;
@@ -529,10 +569,11 @@ body {
    ======================================== */
 
 .carrito-container {
-  background: white;
+  background: linear-gradient(135deg, #e0f2fe 0%, #c7d2fe 100%);
   border-radius: 8px;
   box-shadow: var(--shadow);
   padding: 2rem;
+  border: 1px solid #bfdbfe;
 }
 
 .carrito-header {
