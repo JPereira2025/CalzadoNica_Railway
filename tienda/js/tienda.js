@@ -225,7 +225,7 @@
         const imgsRes = await fetch(`/api/productos/${encodeURIComponent(id)}/imagenes`);
         const imgsData = imgsRes.ok ? await imgsRes.json() : [];
         const imgs = Array.isArray(imgsData) ? imgsData : [];
-        const validImgs = imgs.filter(i => i && typeof i.url === 'string' && i.url.trim() && !i.url.includes('/tienda/img/sin-imagen.svg') && !i.url.includes('sin-imagen.svg'));
+        const validImgs = imgs.filter(i => i && typeof i.url === 'string' && i.url.trim() && !i.url.toLowerCase().endsWith('sin-imagen.svg'));
         const miniCont = document.getElementById('miniaturas');
         if (miniCont) {
           miniCont.innerHTML = '';
@@ -268,10 +268,15 @@
             if (mainImg) {
               mainImg.onclick = () => openLightbox(currentImageIndex);
             }
-            ensureCarouselControls();
+            if (validImgs.length > 1) {
+              ensureCarouselControls();
+            } else {
+              removeCarouselControls();
+            }
           } else {
             // si no hay imágenes en tabla, usar imagen principal del producto
-            currentImages = [{ id: null, url: p.imagen_principal || '/tienda/img/sin-imagen.svg', es_principal: true }];
+            const fallbackImg = (p.imagen_principal && !p.imagen_principal.toLowerCase().endsWith('sin-imagen.svg')) ? p.imagen_principal : '/tienda/img/sin-imagen.svg';
+            currentImages = [{ id: null, url: fallbackImg, es_principal: true }];
             currentImageIndex = 0;
             setCurrentImage(0);
             removeCarouselControls();
