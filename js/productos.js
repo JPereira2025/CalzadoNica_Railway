@@ -192,7 +192,7 @@ function setupProductImageManagementListeners() {
     });
 
     // Subir imagen al servidor
-    $(document).on('click', '#btn-upload-img', function() {
+    $(document).on('click', '#btn-upload-img', async function(e) {
         const prodId = $('#producto-id-form').val();
         if (!prodId) {
             showNotification('Primero debe guardar el producto para poder subir imágenes.', 'error');
@@ -205,34 +205,40 @@ function setupProductImageManagementListeners() {
             return;
         }
 
-        const fd = new FormData();
-        fd.append('imagen', fileEl.files[0]);
-        // Puedes añadir campos para es_principal y orden si los necesitas en el modal
-        // fd.append('es_principal', '0'); 
-        // fd.append('orden', '0');
-
         const token = sessionStorage.getItem('authToken');
-        $.ajax({
-            url: mapEndpoint(`api/productos/${prodId}/imagenes`),
-            method: 'POST',
-            data: fd,
-            processData: false, // Importante para FormData
-            contentType: false, // Importante para FormData
-            headers: { 'Authorization': token ? 'Bearer ' + token : '' }
-        }).done(resp => {
-            showNotification(resp.message, 'success');
+        const $btn = $(this);
+        $btn.prop('disabled', true).text('Subiendo...');
+
+        try {
+            for (let i = 0; i < fileEl.files.length; i++) {
+                const fd = new FormData();
+                fd.append('imagen', fileEl.files[i]);
+                await $.ajax({
+                    url: mapEndpoint(`api/productos/${prodId}/imagenes`),
+                    method: 'POST',
+                    data: fd,
+                    processData: false,
+                    contentType: false,
+                    headers: { 'Authorization': token ? 'Bearer ' + token : '' }
+                });
+            }
+            showNotification('Imágenes subidas correctamente', 'success');
             $('#producto-nueva-imagen').val(''); // Limpiar input de archivo
             $('#btn-upload-img').addClass('hidden'); // Ocultar botón de subir
             loadImagesForProductModal(prodId); // Recargar lista de imágenes
             loadProductos(); // Para actualizar la imagen principal en la tabla
-        }).fail((xhr) => {
-            showNotification('Error subiendo imagen', 'error');
-            console.error('Upload error', xhr.responseText || xhr);
-        });
+        } catch (err) {
+            showNotification('Error al subir una o más imágenes', 'error');
+            console.error(err);
+        } finally {
+            $btn.prop('disabled', false).text('Cargar a Servidor');
+        }
     });
 
     // Eliminar imagen
-    $(document).on('click', '.btn-delete-imagen-modal', function() {
+    $(document).on('click', '.btn-delete-imagen-modal', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
         if (!confirm('¿Eliminar esta imagen?')) return;
         const imgId = $(this).data('imgid');
         const prodId = $('#producto-id-form').val();
@@ -252,7 +258,9 @@ function setupProductImageManagementListeners() {
     });
 
     // Marcar imagen como principal
-    $(document).on('click', '.btn-set-principal-modal', function() {
+    $(document).on('click', '.btn-set-principal-modal', function(e) {
+        e.preventDefault();
+        e.stopPropagation();
         const imgId = $(this).data('imgid');
         const prodId = $('#producto-id-form').val();
         const token = sessionStorage.getItem('authToken');
@@ -290,8 +298,8 @@ function loadImagesForProductModal(prodId) {
         imgs.forEach(img => {
             const thumb = `<div class="border p-2 rounded relative">
                 <img src="${img.url}" class="w-full h-32 object-cover rounded mb-2" />
-                <div class="flex justify-between gap-2">
-                  <button class="btn-set-principal-modal bg-blue-600 text-white py-1 px-2 rounded text-sm" data-imgid="${img.id}">${img.es_principal ? 'Principal' : 'Marcar'}</button>
+                <div class="flex flex-col gap-2">
+                  <button class="btn-set-principal-modal ${img.es_principal ? 'bg-green-600' : 'bg-blue-600'} text-white py-1 px-2 rounded text-sm" data-imgid="${img.id}">${img.es_principal ? '★ Principal' : 'Marcar Principal'}</button>
                   <button class="btn-delete-imagen-modal bg-red-600 text-white py-1 px-2 rounded text-sm" data-imgid="${img.id}">Eliminar</button>
                 </div>
             </div>`;
