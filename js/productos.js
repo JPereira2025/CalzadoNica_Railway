@@ -19,10 +19,19 @@ function setupProductosListeners() {
     $(document).on('click', '.btn-delete-producto', function() {
         if (!ensureAdminAction('eliminar un producto')) return;
         const id = $(this).closest('tr').data('id');
-        if (confirm('¿Eliminar producto?')) {
+        if (confirm('¿Eliminar producto? (Si está en ventas, usa stock = 0 en su lugar)')) {
             apiCall(`productos.php?id=${id}`, 'DELETE').done(resp => {
-                showNotification(resp.message, 'success');
+                if (resp && resp.success === false) {
+                    showNotification(resp.message || 'Error al eliminar', 'error');
+                    console.error("[DELETE_FAIL]", resp);
+                    return;
+                }
+                showNotification(resp.message || 'Producto eliminado', 'success');
                 loadProductos();
+            }).fail(xhr => {
+                const errorMsg = xhr.responseJSON?.message || 'Error al eliminar el producto';
+                showNotification(errorMsg, 'error');
+                console.error("[DELETE_ERROR]", xhr.status, xhr.responseJSON);
             });
         }
     });
@@ -250,17 +259,28 @@ function setupProductImageManagementListeners() {
         const imgId = $(this).data('imgid');
         const prodId = $('#producto-id-form').val();
         const token = sessionStorage.getItem('authToken');
+        
+        if (!imgId || !prodId) {
+            showNotification('Error: ID de imagen o producto inválido', 'error');
+            return;
+        }
+        
         $.ajax({
             url: mapEndpoint(`api/productos/${prodId}/imagenes/${imgId}`),
             method: 'DELETE',
-            headers: { 'Authorization': token ? 'Bearer ' + token : '' }
-        }).done(() => {
-            showNotification('Imagen eliminada', 'success');
+            headers: { 
+                'Authorization': token ? 'Bearer ' + token : '',
+                'Content-Type': 'application/json'
+            }
+        }).done((resp) => {
+            console.log("[DELETE_IMG_SUCCESS]", resp);
+            showNotification(resp.message || 'Imagen eliminada correctamente', 'success');
             loadImagesForProductModal(prodId);
-            loadProductos(); // Para actualizar la imagen principal en la tabla
+            loadProductos();
         }).fail((xhr) => {
-            showNotification('Error eliminando imagen', 'error');
-            console.error(xhr.responseText || xhr);
+            console.error("[DELETE_IMG_FAIL]", xhr.status, xhr.responseJSON || xhr.responseText);
+            const errorMsg = xhr.responseJSON?.message || 'Error al eliminar la imagen';
+            showNotification(errorMsg, 'error');
         });
     });
 

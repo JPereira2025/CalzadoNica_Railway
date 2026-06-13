@@ -130,33 +130,45 @@ async function deleteProductoImagen(req, res) {
     const productoId = req.params.id;
     const imgId = Number(req.params.imgId);
     if (!productoId || !imgId) return res.status(400).json({ success: false, message: 'Producto e imagen requeridos' });
+    
     let img = null;
-    if (prisma.producto_imagenes && typeof prisma.producto_imagenes.findUnique === 'function') {
-      img = await prisma.producto_imagenes.findUnique({ where: { id: imgId } });
-    } else {
+    try {
+      // Usar SQL directo siempre para garantizar que funcione
       const rows = await prisma.$queryRawUnsafe('SELECT * FROM producto_imagenes WHERE id = ? LIMIT 1', Number(imgId));
       img = (rows && rows.length) ? rows[0] : null;
+    } catch (e) {
+      console.error('[IMG_QUERY_ERROR]:', e);
     }
+    
     if (!img) return res.status(404).json({ success: false, message: 'Imagen no encontrada' });
-    // borrar fichero si está en public/tienda/img
+    
+    // Borrar fichero si está en public/tienda/img
     try {
       if (img.url && img.url.startsWith('/tienda/img/')) {
         const filename = img.url.replace('/tienda/img/', '');
         const filePath = path.join(__dirname, '..', '..', 'public', 'tienda', 'img', filename);
-        if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+          console.log(`[FS] Imagen eliminada: ${filePath}`);
+        }
       }
     } catch (fsErr) {
-      console.error('FS delete error:', fsErr);
+      console.warn(`[FS_WARN] Error al borrar archivo físico de ${imgId}:`, fsErr.message);
     }
-    if (prisma.producto_imagenes && typeof prisma.producto_imagenes.delete === 'function') {
-      await prisma.producto_imagenes.delete({ where: { id: imgId } });
-    } else {
+    
+    // Eliminar registro de BD - usar SQL directo siempre
+    try {
       await prisma.$executeRawUnsafe('DELETE FROM producto_imagenes WHERE id = ?', Number(imgId));
+      console.log(`[DB] Imagen ${imgId} eliminada de BD`);
+    } catch (delErr) {
+      console.error('[DB_DELETE_ERROR]:', delErr);
+      return res.status(500).json({ success: false, message: `Error al eliminar imagen de BD: ${delErr.message}` });
     }
-    res.json({ success: true, message: 'Imagen eliminada' });
+    
+    res.json({ success: true, message: 'Imagen eliminada correctamente' });
   } catch (error) {
-    console.error('DELETE IMG ERROR:', error);
-    res.status(500).json({ success: false, message: 'Error al eliminar imagen' });
+    console.error('[DELETE_IMG_ERROR]:', error);
+    res.status(500).json({ success: false, message: `Error al eliminar imagen: ${error.message}` });
   }
 }
 
@@ -819,22 +831,31 @@ async function getProductos(req, res) {
 async function createProducto(req, res) {
   const { id, marca, modelo, talla, color, precio, stock, categoria_id, estilo_id } = req.body;
 
+  // Validar formato del ID: debe seguir patrón PROD-XX-### (case-insensitive)
+  if (!id || !/^PROD-[A-Z]{2}-\d{3}$/i.test(id.trim())) {
+    return res.status(400).json({ 
+      success: false, 
+      message: `Formato de ID inválido. Debe ser: PROD-XX-### (ej: PROD-MA-002)` 
+    });
+  }
+
   // Soportar comas, slashes (/) o punto y coma como separadores para facilitar el ingreso manual
   const listaTallas = String(talla || '').split(/[,\/\;]+/).map(s => s.trim()).filter(Boolean);
   const listaColores = String(color || '').split(/[,\/\;]+/).map(s => s.trim()).filter(Boolean);
 
-  if (!id || !marca || !modelo || listaTallas.length === 0 || listaColores.length === 0) {
+  if (!marca || !modelo || listaTallas.length === 0 || listaColores.length === 0) {
     return res.status(400).json({ success: false, message: 'Faltan campos requeridos para crear producto' });
   }
 
   try {
     const creados = [];
+    const baseId = id.trim().toUpperCase();
     await prisma.$transaction(async (tx) => {
       for (const c of listaColores) {
         for (const t of listaTallas) {
-          // ID Único: IDBASE-COLOR-TALLA (Ej: NIKE-ROJO-38)
+          // ID Único: PRODBASE-COLOR-TALLA (Ej: PROD-MA-002-ROJ-38)
           const colorSlug = c.substring(0,3).toUpperCase();
-          const finalId = `${id}-${colorSlug}-${t}`;
+          const finalId = `${baseId}-${colorSlug}-${t}`;
 
           await tx.productos.create({
             data: {
@@ -975,33 +996,52 @@ async function deleteProducto(req, res) {
   }
 
   try {
-    // 1. Limpieza automática de imágenes asociadas para evitar errores de integridad (FK)
+    console.log(`[DELETE_PRODUCTO] Iniciando eliminación de: ${id}`);
+    
+    // 1. Limpieza de imágenes - usar SQL directo siempre
+    let imgDeleted = 0;
     try {
-      if (prisma.producto_imagenes && typeof prisma.producto_imagenes.deleteMany === 'function') {
-        await prisma.producto_imagenes.deleteMany({ where: { producto_id: String(id) } });
-      } else {
-        // Fallback SQL por si el modelo no está mapeado en el cliente Prisma
-        await prisma.$executeRawUnsafe('DELETE FROM producto_imagenes WHERE producto_id = ?', String(id));
-      }
+      const result = await prisma.$executeRawUnsafe(
+        'DELETE FROM producto_imagenes WHERE producto_id = ?', 
+        String(id)
+      );
+      imgDeleted = result || 0;
+      console.log(`[DELETE_PRODUCTO] ${imgDeleted} imágenes eliminadas`);
     } catch (imgErr) {
-      console.warn(`[WARN] No se pudieron limpiar imágenes al borrar producto ${id}:`, imgErr.message);
+      console.warn(`[WARN] Error al eliminar imágenes de ${id}:`, imgErr.message);
     }
 
-    // 2. Intentar borrar la variante específica del producto
-    await prisma.productos.delete({ where: { id } });
-    res.json({ success: true, message: 'Producto eliminado' });
-  } catch (error) {
-    console.error('[DELETE_PRODUCTO_ERROR]:', error);
-    
-    // Error de clave foránea: El zapato ya se vendió y está en una factura real
-    if (error.code === 'P2003') {
-      return res.status(400).json({ 
+    // 2. Intentar borrar producto
+    try {
+      await prisma.productos.delete({ where: { id: String(id) } });
+      console.log(`[DELETE_PRODUCTO] Producto ${id} eliminado exitosamente`);
+      return res.json({ 
+        success: true, 
+        message: `Producto eliminado (${imgDeleted} imágenes borradas)`
+      });
+    } catch (delErr) {
+      console.error(`[DELETE_PRODUCTO_ERROR] No se pudo eliminar ${id}:`, delErr.code, delErr.message);
+      
+      // Error P2003: clave foránea - producto está en facturas/pedidos
+      if (delErr.code === 'P2003') {
+        return res.status(400).json({ 
+          success: false, 
+          message: 'No se puede eliminar: este producto está registrado en ventas/facturas. Usa stock = 0 para ocultarlo.'
+        });
+      }
+      
+      // Otros errores
+      return res.status(500).json({ 
         success: false, 
-        message: 'No se puede eliminar: este zapato ya tiene ventas registradas (facturas). Para que no aparezca, ponle stock 0.' 
+        message: `Error al eliminar: ${delErr.message || 'Error desconocido'}`
       });
     }
-    
-    res.status(500).json({ success: false, message: 'Error interno al intentar eliminar el producto.' });
+  } catch (error) {
+    console.error('[DELETE_PRODUCTO_OUTER_ERROR]:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: `Error interno: ${error.message}` 
+    });
   }
 }
 
