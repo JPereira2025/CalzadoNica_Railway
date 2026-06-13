@@ -63,7 +63,7 @@ router.delete('/productos', authenticateToken, requireAdmin, deleteProducto);
 // Subir imagen de producto (admin)
 const multer = require('multer');
 const path = require('path');
-const imgDir = path.join(__dirname, '..', '..', 'public', 'tienda', 'img');
+const imgDir = path.join(__dirname, '..', '..', 'uploads');
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, imgDir),
   filename: (req, file, cb) => {
@@ -76,7 +76,7 @@ const upload = multer({ storage });
 
 // Rutas de imágenes - usar query param ?id= para evitar problemas con caracteres especiales en la ruta
 router.post('/productos/imagenes/upload', authenticateToken, requireAdmin, upload.single('imagen'), (req, res, next) => {
-  req.file && (req.file.url = `/tienda/img/${req.file.filename}`);
+  req.file && (req.file.url = `/uploads/${req.file.filename}`);
   const { uploadProductoImagen } = require('../controllers/apiController');
   return uploadProductoImagen(req, res, next);
 });

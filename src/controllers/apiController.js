@@ -142,15 +142,20 @@ async function deleteProductoImagen(req, res) {
     
     if (!img) return res.status(404).json({ success: false, message: 'Imagen no encontrada' });
     
-    // Borrar fichero si está en public/tienda/img
+    // Borrar fichero físico en la carpeta de subida persistente o en la ruta legacy de tienda/img
     try {
-      if (img.url && img.url.startsWith('/tienda/img/')) {
+      let filePath = null;
+      if (img.url && img.url.startsWith('/uploads/')) {
+        const filename = img.url.replace('/uploads/', '');
+        filePath = path.join(__dirname, '..', '..', 'uploads', filename);
+      } else if (img.url && img.url.startsWith('/tienda/img/')) {
         const filename = img.url.replace('/tienda/img/', '');
-        const filePath = path.join(__dirname, '..', '..', 'public', 'tienda', 'img', filename);
-        if (fs.existsSync(filePath)) {
-          fs.unlinkSync(filePath);
-          console.log(`[FS] Imagen eliminada: ${filePath}`);
-        }
+        filePath = path.join(__dirname, '..', '..', 'public', 'tienda', 'img', filename);
+      }
+
+      if (filePath && fs.existsSync(filePath)) {
+        fs.unlinkSync(filePath);
+        console.log(`[FS] Imagen eliminada: ${filePath}`);
       }
     } catch (fsErr) {
       console.warn(`[FS_WARN] Error al borrar archivo físico de ${imgId}:`, fsErr.message);
