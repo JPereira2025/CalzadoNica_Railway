@@ -142,7 +142,13 @@ function handleProductoSubmit(e) {
     console.log("Enviando payload de producto:", payload);
 
     apiCall('productos.php', method, payload).done(resp => {
-        showNotification(resp.message, 'success');
+        // Verificar si la respuesta indica éxito (no asumir que HTTP 200 = éxito)
+        if (resp && resp.success === false) {
+            showNotification(resp.message || 'Error al guardar el producto', 'error');
+            console.error("[PRODUCTO_ERROR]", resp);
+            return;
+        }
+        showNotification(resp.message || 'Producto guardado exitosamente', 'success');
         $('#modal-producto').fadeOut(200);
         loadProductos();
     }).fail(xhr => {
@@ -159,6 +165,7 @@ function handleProductoSubmit(e) {
  */
 function renderProductoRow(producto) {
     const precioF = parseFloat(producto.precio || 0).toFixed(2);
+    const displayStock = (producto.stock_total !== undefined) ? producto.stock_total : (producto.stock || 0);
     return `
     <tr data-id="${producto.id}">
         <td class="py-3 px-4">${producto.id}</td>
@@ -167,7 +174,7 @@ function renderProductoRow(producto) {
         <td class="py-3 px-4">${producto.talla || ''}</td>
         <td class="py-3 px-4">${producto.color || ''}</td>
         <td class="py-3 px-4">C$${precioF}</td>
-        <td class="py-3 px-4">${producto.stock || 0}</td>
+        <td class="py-3 px-4">${displayStock}</td>
         <td class="py-3 px-4">${producto.categoria_nombre || ''}</td>
         <td class="py-3 px-4">${producto.estilo_nombre || ''}</td>
         <td class="py-3 px-4 text-center">

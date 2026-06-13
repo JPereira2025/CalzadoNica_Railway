@@ -193,7 +193,8 @@
       document.getElementById('producto-marca').textContent = p.categoria_nombre || '';
       document.getElementById('producto-detalles').textContent = `${p.talla} · ${p.color || ''}`;
       document.getElementById('producto-precio').textContent = formatCurrency(p.precio);
-      document.getElementById('producto-stock').textContent = p.stock > 0 ? 'En stock' : 'Agotado';
+      const isAvailable = (p.stock_total !== undefined) ? p.stock_total > 0 : p.stock > 0;
+      document.getElementById('producto-stock').textContent = isAvailable ? 'En stock' : 'Agotado';
       document.getElementById('img-principal').src = p.imagen_principal || '/tienda/img/sin-imagen.svg';
       // rellenar selectores de talla y color si existen
       try {

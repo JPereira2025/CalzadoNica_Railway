@@ -788,22 +788,25 @@ async function getProductos(req, res) {
         if (group.imagen_principal.toLowerCase().endsWith('sin-imagen.svg') && !p.imagen_principal.toLowerCase().endsWith('sin-imagen.svg')) {
           group.imagen_principal = p.imagen_principal;
         }
-
-        // Actualizamos textos visuales para la tabla
-        group.talla = group.tallas_array.sort((a,b) => a-b).join(', ');
-        group.color = group.colores_array.join(', ');
-        group.stock = group.stock_total;
       }
     });
 
     if (id) {
       const target = mapped.find(prod => prod.id === String(id));
       if (!target) return res.json({});
-      // Devolver el grupo completo (Marca + Modelo) para que la tienda pueda mostrar colores/tallas
-      const marcaKey = (target.marca || 'Genérico').toLowerCase();
-      const modeloKey = (target.modelo || 'Sin Modelo').toLowerCase();
+      
+      const marcaKey = String(target.marca || 'Genérico').trim().toLowerCase();
+      const modeloKey = String(target.modelo || 'Sin Modelo').trim().toLowerCase();
       const key = `${marcaKey}|${modeloKey}`;
-      return res.json(grouped.get(key) || target);
+      const groupData = grouped.get(key);
+
+      // Retornamos la variante real pero le adjuntamos info de grupo como extras
+      return res.json({
+        ...target,
+        stock_total: groupData ? groupData.stock_total : target.stock,
+        variantes: groupData ? groupData.variantes : [],
+        tallas_disponibles: groupData ? groupData.tallas_array : [target.talla]
+      });
     }
 
     res.json(Array.from(grouped.values()));
@@ -866,43 +869,102 @@ async function createProducto(req, res) {
 }
 
 // --- UPDATE PRODUCTO ---
-// NOTA: Esta función actualiza una VARIANTE específica.
-// No está diseñada para actualizar un "producto maestro" (Marca+Modelo)
-// Si se intenta actualizar talla o color de una variante, puede causar errores si son parte del ID.
+// MEJORADO: Cuando se edita un producto existente y se agregan nuevas tallas,
+// crea registros nuevos para las tallas adicionales en lugar de fallar
 async function updateProducto(req, res) {
   const { id, marca, modelo, talla, color, precio, stock, categoria_id, estilo_id } = req.body;
   if (!id) {
     return res.status(400).json({ success: false, message: 'ID requerido para actualizar producto' });
   }
 
-  const data = {};
-  if (marca) data.marca = String(marca);
-  if (modelo) data.modelo = String(modelo);
-  // No permitir actualizar talla o color directamente si son parte del ID de la variante
-  // Si se necesita cambiar esto, se debe eliminar la variante y crear una nueva.
-  // if (talla) data.talla = String(talla);
-  // if (color !== undefined) data.color = color ? String(color) : null;
-  if (precio !== undefined) data.precio = Number(precio);
-  if (stock !== undefined) data.stock = Number(stock);
-  if (categoria_id !== undefined) data.categoria_id = categoria_id ? String(categoria_id) : null;
-  if (estilo_id !== undefined) data.estilo_id = estilo_id ? String(estilo_id) : null;
-
-  if (Object.keys(data).length === 0) {
-    return res.status(400).json({ success: false, message: 'Nada que actualizar' });
-  }
-
   try {
-    await prisma.productos.update({ where: { id: String(id) }, data });
-    res.json({ success: true, message: 'Producto actualizado' });
-  } catch (error) {
-    console.error('[UPDATE_PRODUCTO_ERROR]:', error); // Log completo del error
-    if (error.code === 'P2002') { // Unique constraint violation
-      return res.status(409).json({ success: false, message: 'Ya existe un producto con estos datos.' });
+    // Obtener el producto actual
+    const productoActual = await prisma.productos.findUnique({ where: { id: String(id) } });
+    if (!productoActual) {
+      return res.status(404).json({ success: false, message: 'Producto no encontrado' });
     }
-    if (error.code === 'P2025') { // Record not found
+
+    // Datos a actualizar en el registro actual (campos simples)
+    const data = {};
+    if (marca) data.marca = String(marca);
+    if (modelo) data.modelo = String(modelo);
+    if (precio !== undefined) data.precio = Number(precio);
+    if (stock !== undefined) data.stock = Math.max(0, parseInt(stock) || 0);
+    if (categoria_id !== undefined) data.categoria_id = categoria_id ? String(categoria_id) : null;
+    if (estilo_id !== undefined) data.estilo_id = estilo_id ? String(estilo_id) : null;
+
+    // Procesar tallas nuevas si las hay
+    let mensajeExtra = '';
+    const tallasNuevas = [];
+    
+    if (talla) {
+      const listaTallasNuevas = String(talla || '').split(/[,\/\;]+/).map(s => s.trim()).filter(Boolean);
+      
+      // Obtener tallas existentes para marca+modelo+color
+      const productosExistentes = await prisma.productos.findMany({
+        where: {
+          marca: String(marca || productoActual.marca),
+          modelo: String(modelo || productoActual.modelo),
+          color: String(color || productoActual.color || '')
+        },
+        select: { talla: true, id: true }
+      });
+      
+      const tallasExistentes = productosExistentes.map(p => p.talla);
+      const tallasFaltantes = listaTallasNuevas.filter(t => !tallasExistentes.includes(t));
+      
+      // Crear registros nuevos para tallas faltantes
+      if (tallasFaltantes.length > 0) {
+        const baseId = `${marca || productoActual.marca}-${color || productoActual.color || 'SIN'}`;
+        const colorSlug = (color || productoActual.color || 'SIN').substring(0,3).toUpperCase();
+        
+        for (const t of tallasFaltantes) {
+          const newId = `${baseId}-${colorSlug}-${t}`.substring(0, 50); // VarChar(50)
+          try {
+            await prisma.productos.create({
+              data: {
+                id: newId,
+                marca: String(marca || productoActual.marca),
+                modelo: String(modelo || productoActual.modelo),
+                talla: String(t),
+                color: String(color || productoActual.color || ''),
+                categoria_id: categoria_id ? String(categoria_id) : (productoActual.categoria_id || null),
+                estilo_id: estilo_id ? String(estilo_id) : (productoActual.estilo_id || null),
+                precio: Number(precio !== undefined ? precio : productoActual.precio),
+                stock: Number(stock !== undefined ? stock : productoActual.stock)
+              }
+            });
+            tallasNuevas.push(t);
+          } catch (e) {
+            console.warn(`[WARN] No se pudo crear talla ${t}:`, e.message);
+          }
+        }
+      }
+      
+      if (tallasFaltantes.length > 0) {
+        mensajeExtra = ` + ${tallasFaltantes.length} talla(s) nueva(s)`;
+      }
+    }
+
+    // Actualizar el registro principal
+    if (Object.keys(data).length > 0) {
+      await prisma.productos.update({ where: { id: String(id) }, data });
+    }
+    
+    res.json({ 
+      success: true, 
+      message: `Producto actualizado${mensajeExtra}`,
+      tallasAgregadas: tallasNuevas
+    });
+  } catch (error) {
+    console.error('[UPDATE_PRODUCTO_ERROR]:', error);
+    if (error.code === 'P2002') {
+      return res.status(409).json({ success: false, message: 'Error: duplicado detectado al guardar.' });
+    }
+    if (error.code === 'P2025') {
       return res.status(404).json({ success: false, message: 'Producto no encontrado para actualizar.' });
     }
-    res.status(500).json({ success: false, message: 'Error interno al actualizar el producto.' });
+    res.status(500).json({ success: false, message: `Error al actualizar: ${error.message}` });
   }
 }
 
@@ -913,11 +975,33 @@ async function deleteProducto(req, res) {
   }
 
   try {
+    // 1. Limpieza automática de imágenes asociadas para evitar errores de integridad (FK)
+    try {
+      if (prisma.producto_imagenes && typeof prisma.producto_imagenes.deleteMany === 'function') {
+        await prisma.producto_imagenes.deleteMany({ where: { producto_id: String(id) } });
+      } else {
+        // Fallback SQL por si el modelo no está mapeado en el cliente Prisma
+        await prisma.$executeRawUnsafe('DELETE FROM producto_imagenes WHERE producto_id = ?', String(id));
+      }
+    } catch (imgErr) {
+      console.warn(`[WARN] No se pudieron limpiar imágenes al borrar producto ${id}:`, imgErr.message);
+    }
+
+    // 2. Intentar borrar la variante específica del producto
     await prisma.productos.delete({ where: { id } });
     res.json({ success: true, message: 'Producto eliminado' });
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ success: false, message: 'Error al eliminar producto' });
+    console.error('[DELETE_PRODUCTO_ERROR]:', error);
+    
+    // Error de clave foránea: El zapato ya se vendió y está en una factura real
+    if (error.code === 'P2003') {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'No se puede eliminar: este zapato ya tiene ventas registradas (facturas). Para que no aparezca, ponle stock 0.' 
+      });
+    }
+    
+    res.status(500).json({ success: false, message: 'Error interno al intentar eliminar el producto.' });
   }
 }
 
