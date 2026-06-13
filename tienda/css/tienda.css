@@ -546,19 +546,24 @@ body {
   font-size: 1rem;
 }
 
-.btn-agregar-carrito {
-  background: var(--secondary);
-  color: white;
+.btn-agregar-carrito, .btn-detalle {
+  background: linear-gradient(135deg, #0ea5e9 0%, #10b981 100%) !important;
+  color: white !important;
+  opacity: 1 !important;
   border: none;
-  padding: 1rem 2rem;
+  padding: 0.8rem 1.5rem;
   font-size: 1rem;
   border-radius: 4px;
   cursor: pointer;
   transition: background 0.3s;
+  text-decoration: none;
+  display: inline-block;
+  text-align: center;
 }
 
-.btn-agregar-carrito:hover {
-  background: #c0392b;
+.btn-agregar-carrito:hover, .btn-detalle:hover {
+  background: linear-gradient(135deg, #10b981 0%, #0ea5e9 100%) !important;
+  color: white !important;
 }
 
 .btn-agregar-carrito:disabled {
