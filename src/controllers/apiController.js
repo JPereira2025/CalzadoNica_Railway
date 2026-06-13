@@ -99,6 +99,24 @@ async function getProductoImagenes(req, res) {
     } else {
       imgs = await prisma.$queryRawUnsafe('SELECT * FROM producto_imagenes WHERE producto_id = ? ORDER BY orden ASC', String(productoId));
     }
+
+    // Si la variante actual no tiene imágenes, buscar imágenes de otras variantes del mismo modelo/marca
+    if ((!imgs || imgs.length === 0) && prisma.productos) {
+      const producto = await prisma.productos.findUnique({ where: { id: String(productoId) } });
+      if (producto && producto.marca && producto.modelo) {
+        const groupProducts = await prisma.productos.findMany({ where: { marca: producto.marca, modelo: producto.modelo } });
+        const groupIds = groupProducts.map(prod => prod.id).filter(Boolean);
+        if (groupIds.length) {
+          if (prisma.producto_imagenes && typeof prisma.producto_imagenes.findMany === 'function') {
+            imgs = await prisma.producto_imagenes.findMany({ where: { producto_id: { in: groupIds } }, orderBy: { orden: 'asc' } });
+          } else {
+            const safeList = groupIds.map(id => String(id).replace(/'/g, "''")).map(id => `'${id}'`).join(',');
+            imgs = await prisma.$queryRawUnsafe(`SELECT * FROM producto_imagenes WHERE producto_id IN (${safeList}) ORDER BY orden ASC`);
+          }
+        }
+      }
+    }
+
     res.json(imgs || []);
   } catch (error) {
     console.error('GET IMAGES ERROR:', error);
