@@ -569,11 +569,11 @@ body {
    ======================================== */
 
 .carrito-container {
-  background: linear-gradient(135deg, #e0f2fe 0%, #c7d2fe 100%);
+  background: linear-gradient(135deg, #0ea5e9 0%, #10b981 100%);
   border-radius: 8px;
   box-shadow: var(--shadow);
   padding: 2rem;
-  border: 1px solid #bfdbfe;
+  border: none;
 }
 
 .carrito-header {
@@ -582,7 +582,8 @@ body {
   align-items: center;
   margin-bottom: 2rem;
   padding-bottom: 1rem;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.3);
+  color: white;
 }
 
 .carrito-item {
@@ -591,7 +592,8 @@ body {
   gap: 1rem;
   align-items: center;
   padding: 1rem 0;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  color: white;
 }
 
 .carrito-item img {
@@ -608,7 +610,7 @@ body {
 }
 
 .carrito-item-info p {
-  color: var(--gray);
+  color: rgba(255, 255, 255, 0.8);
   font-size: 0.9rem;
 }
 
@@ -626,8 +628,9 @@ body {
 .carrito-item-cantidad button {
   width: 30px;
   height: 30px;
-  border: 1px solid var(--border);
-  background: white;
+  border: 1px solid white;
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
   cursor: pointer;
   border-radius: 4px;
 }
@@ -639,9 +642,9 @@ body {
 }
 
 .btn-eliminar {
-  background: var(--secondary);
+  background: rgba(255, 255, 255, 0.3);
   color: white;
-  border: none;
+  border: 1px solid white;
   padding: 0.3rem 0.6rem;
   border-radius: 4px;
   cursor: pointer;
