@@ -299,33 +299,58 @@
       try {
         const tallaSel = document.getElementById('talla');
         const colorSel = document.getElementById('color');
-        const rawTallas = Array.isArray(p.tallas) && p.tallas.length ? p.tallas : (p.talla ? [p.talla] : []);
-        const tallas = rawTallas.reduce((acc, raw) => {
-          if (typeof raw !== 'string') return acc;
-          raw.split(/[,;\/\s]+/).map(t => t.trim()).filter(Boolean).forEach(t => { if (!acc.includes(t)) acc.push(t); });
-          return acc;
-        }, []);
-        const rawColores = Array.isArray(p.colores_array) && p.colores_array.length ? p.colores_array : (p.color ? [p.color] : []);
-        const colores = rawColores.reduce((acc, raw) => {
-          if (typeof raw !== 'string') return acc;
-          raw.split(/[,;\/]+/).map(c => c.trim()).filter(Boolean).forEach(c => { if (!acc.includes(c)) acc.push(c); });
-          return acc;
-        }, []);
+        
+        // Priorizar campos nuevos del API agrupado
+        let tallas = p.tallas_disponibles || [];
+        if (!Array.isArray(tallas) || tallas.length === 0) {
+          // Fallback a variantes
+          if (Array.isArray(p.variantes) && p.variantes.length) {
+            tallas = [...new Set(p.variantes.map(v => v.talla).filter(Boolean))];
+          } else if (Array.isArray(p.tallas) && p.tallas.length) {
+            // Fallback a campo antiguo tallas
+            tallas = p.tallas;
+          } else if (p.talla) {
+            // Fallback a single talla
+            tallas = [p.talla];
+          }
+        }
+        
+        let colores = p.colores_disponibles || [];
+        if (!Array.isArray(colores) || colores.length === 0) {
+          // Fallback a variantes
+          if (Array.isArray(p.variantes) && p.variantes.length) {
+            colores = [...new Set(p.variantes.map(v => v.color).filter(Boolean))];
+          } else if (Array.isArray(p.colores_array) && p.colores_array.length) {
+            // Fallback a campo antiguo colores_array
+            colores = p.colores_array;
+          } else if (p.color) {
+            // Fallback a single color
+            colores = [p.color];
+          }
+        }
+        
         if (tallaSel) {
           tallaSel.innerHTML = '<option value="">Selecciona talla</option>';
           tallas.forEach(t => {
-            const opt = document.createElement('option'); opt.value = t; opt.textContent = t; tallaSel.appendChild(opt);
+            const opt = document.createElement('option'); 
+            opt.value = String(t).trim(); 
+            opt.textContent = String(t).trim(); 
+            tallaSel.appendChild(opt);
           });
-          if (tallas.length === 1) tallaSel.value = String(tallas[0]);
+          if (tallas.length === 1) tallaSel.value = String(tallas[0]).trim();
         }
+        
         if (colorSel) {
           colorSel.innerHTML = '<option value="">Selecciona color</option>';
           colores.forEach(c => {
-            const opt = document.createElement('option'); opt.value = c; opt.textContent = c; colorSel.appendChild(opt);
+            const opt = document.createElement('option'); 
+            opt.value = String(c).trim(); 
+            opt.textContent = String(c).trim(); 
+            colorSel.appendChild(opt);
           });
-          if (colores.length === 1) colorSel.value = String(colores[0]);
+          if (colores.length === 1) colorSel.value = String(colores[0]).trim();
         }
-      } catch (e) { /* noop */ }
+      } catch (e) { console.warn('Error poblando tallas/colores:', e); }
       // preparar carrusel
       currentImages = [];
       currentImageIndex = 0;
