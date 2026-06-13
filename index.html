@@ -511,6 +511,32 @@ body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; overflow-x:
         </div>
     </div>
 
+    <div id="producto-variantes-section" class="mt-6 p-4 border border-gray-200 rounded-lg bg-gray-50">
+        <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4">
+            <div>
+                <h4 class="text-lg font-semibold text-gray-800">Variantes</h4>
+                <p class="text-sm text-gray-500">Añade tallas, colores y stock por variante. Si la tabla está vacía, se usarán los campos estándar de color/talla/stock.</p>
+            </div>
+            <button type="button" id="btn-add-variant-row" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white py-2 px-4 rounded-lg transition-colors">
+                <i class="fas fa-plus"></i>Agregar variante
+            </button>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full table-auto border-collapse">
+                <thead>
+                    <tr class="bg-white text-left text-gray-600 border-b border-gray-200">
+                        <th class="py-2 px-3">Color</th>
+                        <th class="py-2 px-3">Talla</th>
+                        <th class="py-2 px-3">Stock</th>
+                        <th class="py-2 px-3">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody id="producto-variantes-body"></tbody>
+            </table>
+        </div>
+        <p class="text-xs text-gray-500 mt-3">Si deseas ingresar una sola variante rápida, completa los campos tradicionales de tallas, color y stock.</p>
+    </div>
+
     <!-- Nueva Sección: Gestión de Imágenes de Productos -->
     <div id="producto-imagenes-section" class="mt-6 border-t pt-4 hidden">
         <h4 class="text-lg font-semibold text-gray-800 mb-3"><i class="fas fa-images mr-2 text-indigo-500"></i>Galería del Zapato</h4>

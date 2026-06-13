@@ -36,6 +36,12 @@ function setupProductosListeners() {
         }
     });
     $(document).on('submit', '#form-producto', handleProductoSubmit);
+    $(document).on('click', '#btn-add-variant-row', function() {
+        renderProductoVariantRows(collectProductoVariantRows().concat([{ color: '', talla: '', stock: '' }]));
+    });
+    $(document).on('click', '.btn-remove-variant', function() {
+        $(this).closest('tr').remove();
+    });
     
     // También permitir que el botón de la imagen en la tabla abra el modal de edición directamente en la sección de fotos
     $(document).on('click', '.btn-images-producto', function() {
@@ -88,15 +94,34 @@ function openProductoModal(id = null) {
                 if (prod) {
                     $('#producto-marca').val(prod.marca);
                     $('#producto-modelo').val(prod.modelo);
-                    // soportar tallas como array o string
-                    if (Array.isArray(prod.tallas) && prod.tallas.length) {
-                        $('#producto-talla').val(prod.tallas.join(','));
+
+                    // tallas: soportar varios formatos retornados por la API
+                    const tallasList = prod.tallas_disponibles || prod.tallas || prod.tallas_array || (prod.variantes && prod.variantes.map(v => v.talla)) || [];
+                                    if (Array.isArray(tallasList) && tallasList.length) {
+                        $('#producto-talla').val(tallasList.join(','));
                     } else {
                         $('#producto-talla').val(prod.talla || '');
                     }
-                    $('#producto-color').val(prod.color);
+
+                    // colores: preferir lista de colores disponibles
+                    const coloresList = prod.colores_disponibles || prod.colores_array || (prod.variantes && prod.variantes.map(v => v.color)) || [];
+                    if (Array.isArray(coloresList) && coloresList.length) {
+                        $('#producto-color').val(coloresList.join(','));
+                    } else {
+                        $('#producto-color').val(prod.color || '');
+                    }
+
                     $('#producto-precio').val(prod.precio);
-                    $('#producto-stock').val(prod.stock);
+
+                    // stock: mostrar stock por variante (primera variante) si existen variantes
+                    if (prod.variantes && prod.variantes.length) {
+                        $('#producto-stock').val(Number(prod.variantes[0].stock) || 0);
+                    } else {
+                        $('#producto-stock').val(prod.stock || 0);
+                    }
+
+                    renderProductoVariantRows(prod.variantes || []);
+
                     $('#producto-categoria').val(prod.categoria_id);
                     $('#producto-estilo').val(prod.estilo_id);
                 }
@@ -109,12 +134,81 @@ function openProductoModal(id = null) {
             console.log("[DEBUG] Ocultando sección de imágenes (Nuevo Producto)");
             $('#producto-imagenes-section').addClass('hidden'); // Ocultar sección de imágenes para nuevo producto
             $('#producto-imagenes-list').html('<p class="col-span-full text-center text-gray-400 text-sm">No hay imágenes. Haz clic en "Elegir Foto" para comenzar.</p>');
+            renderProductoVariantRows([]);
             openModal('#modal-producto');
         }
     }).catch(error => {
         console.error("Error al cargar datos para el modal de producto:", error);
         showNotification('No se pudieron cargar los datos necesarios para el formulario de productos.', 'error');
     });
+}
+
+function renderProductoVariantRows(variantes = []) {
+    const $body = $('#producto-variantes-body');
+    $body.empty();
+
+    const rows = Array.isArray(variantes) && variantes.length ? variantes : [{ color: '', talla: '', stock: '' }];
+    rows.forEach(variant => {
+        const rowId = variant.id ? variant.id : '';
+        const color = String(variant.color || '').trim();
+        const talla = String(variant.talla || '').trim();
+        const stock = variant.stock !== undefined && variant.stock !== null ? Number(variant.stock) : '';
+        const html = `
+            <tr>
+                <td class="py-2 px-3 border-b border-gray-200">
+                    <input type="hidden" class="variant-id" value="${rowId}">
+                    <input type="text" class="variant-color w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500" value="${escapeHtml(color)}" placeholder="Negro / Azul">
+                </td>
+                <td class="py-2 px-3 border-b border-gray-200">
+                    <input type="text" class="variant-talla w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500" value="${escapeHtml(talla)}" placeholder="38">
+                </td>
+                <td class="py-2 px-3 border-b border-gray-200">
+                    <input type="number" min="0" class="variant-stock w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500" value="${stock}" placeholder="0">
+                </td>
+                <td class="py-2 px-3 border-b border-gray-200 text-right">
+                    <button type="button" class="btn-remove-variant inline-flex items-center justify-center bg-red-500 hover:bg-red-600 text-white rounded-md px-3 py-2 text-sm">
+                        <i class="fas fa-trash-alt"></i>
+                    </button>
+                </td>
+            </tr>`;
+        $body.append(html);
+    });
+}
+
+function collectProductoVariantRows() {
+    const variants = [];
+    $('#producto-variantes-body tr').each(function() {
+        const $row = $(this);
+        const id = String($row.find('.variant-id').val() || '').trim();
+        const color = String($row.find('.variant-color').val() || '').trim();
+        const talla = String($row.find('.variant-talla').val() || '').trim();
+        const stock = parseInt($row.find('.variant-stock').val(), 10);
+
+        if (!color && !talla) {
+            return;
+        }
+
+        if (!color || !talla) {
+            return;
+        }
+
+        variants.push({
+            id: id || undefined,
+            color,
+            talla,
+            stock: Number.isNaN(stock) ? 0 : stock
+        });
+    });
+    return variants;
+}
+
+function escapeHtml(value) {
+    return String(value || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
 }
 
 /**
@@ -124,11 +218,13 @@ function handleProductoSubmit(e) {
     e.preventDefault();
     if (!ensureAdminAction('guardar un producto')) return;
     const id = $('#producto-id-form').val();
+    const variants = collectProductoVariantRows();
     const payload = {
         marca: $('#producto-marca').val(),
         modelo: $('#producto-modelo').val(),
-        talla: String($('#producto-talla').val() || '').trim(),
-        color: String($('#producto-color').val() || '').trim(),
+        talla: variants.length ? variants.map(v => v.talla).join(',') : String($('#producto-talla').val() || '').trim(),
+        color: variants.length ? variants.map(v => v.color).join(',') : String($('#producto-color').val() || '').trim(),
+        variantes: variants.length ? variants : undefined,
         precio: parseFloat($('#producto-precio').val()) || 0,
         stock: parseInt($('#producto-stock').val()) || 0,
         categoria_id: String($('#producto-categoria').val()),
@@ -342,7 +438,8 @@ function loadImagesForProductModal(prodId) {
  * Genera ID único para producto
  */
 function generateProductoId(payload) {
-    const marca = payload.marca ? payload.marca.substring(0, 2).toUpperCase() : 'XX';
+    const rawMarca = String(payload.marca || 'XX').toUpperCase().replace(/[^A-Z0-9]/g, '');
+    const marca = rawMarca.padEnd(2, 'X').substring(0, 2);
     const consecutivo = String(window.idCounters.productos++).padStart(3, '0');
     return `PROD-${marca}-${consecutivo}`;
 }

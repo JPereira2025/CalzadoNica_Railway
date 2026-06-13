@@ -817,7 +817,8 @@ async function getProductos(req, res) {
         ...target,
         stock_total: groupData ? groupData.stock_total : target.stock,
         variantes: groupData ? groupData.variantes : [],
-        tallas_disponibles: groupData ? groupData.tallas_array : [target.talla]
+        tallas_disponibles: groupData ? groupData.tallas_array : [target.talla],
+        colores_disponibles: groupData ? groupData.colores_array : (target.color ? [target.color] : [])
       });
     }
 
@@ -828,61 +829,95 @@ async function getProductos(req, res) {
   }
 }
 
-async function createProducto(req, res) {
-  const { id, marca, modelo, talla, color, precio, stock, categoria_id, estilo_id } = req.body;
+function getVariantBaseId(productId) {
+  if (!productId) return '';
+  const parts = String(productId).trim().split('-');
+  if (parts.length <= 3) return String(productId).trim().toUpperCase();
+  return parts.slice(0, parts.length - 2).join('-').toUpperCase();
+}
 
-  // Validar formato del ID: debe seguir patrón PROD-XX-### (case-insensitive)
-  if (!id || !/^PROD-[A-Z]{2}-\d{3}$/i.test(id.trim())) {
+function createVariantId(baseId, color, talla) {
+  const safeColor = String(color || 'SIN')
+    .trim()
+    .substring(0, 3)
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, '');
+  const safeTalla = String(talla || '').trim().replace(/\s+/g, '');
+  return String(`${baseId}-${safeColor}-${safeTalla}`).substring(0, 50);
+}
+
+function normalizeVariantInput(variant) {
+  if (!variant) return null;
+  const color = String(variant.color || '').trim();
+  const talla = String(variant.talla || '').trim();
+  if (!color || !talla) return null;
+  const stock = variant.stock === undefined || variant.stock === null ? 0 : Number(variant.stock);
+  return {
+    id: variant.id ? String(variant.id).trim() : undefined,
+    color,
+    talla,
+    stock: Number.isNaN(stock) ? 0 : stock
+  };
+}
+
+async function createProducto(req, res) {
+  const { id, marca, modelo, talla, color, precio, stock, categoria_id, estilo_id, variantes } = req.body;
+  const variantRows = Array.isArray(variantes)
+    ? variantes.map(normalizeVariantInput).filter(Boolean)
+    : [];
+
+  if (!id || !/^PROD-[A-Z]{2}-\d{3}$/i.test(String(id).trim())) {
     return res.status(400).json({ 
       success: false, 
-      message: `Formato de ID inválido. Debe ser: PROD-XX-### (ej: PROD-MA-002)` 
+      message: 'Formato de ID inválido. Debe ser: PROD-XX-### (ej: PROD-MA-002)' 
     });
   }
 
-  // Soportar comas, slashes (/) o punto y coma como separadores para facilitar el ingreso manual
-  const listaTallas = String(talla || '').split(/[,\/\;]+/).map(s => s.trim()).filter(Boolean);
-  const listaColores = String(color || '').split(/[,\/\;]+/).map(s => s.trim()).filter(Boolean);
+  const baseId = String(id).trim().toUpperCase();
+  const listaTallas = variantRows.length === 0
+    ? String(talla || '').split(/[,\/\;]+/).map(s => s.trim()).filter(Boolean)
+    : [];
+  const listaColores = variantRows.length === 0
+    ? String(color || '').split(/[,\/\;]+/).map(s => s.trim()).filter(Boolean)
+    : [];
 
-  if (!marca || !modelo || listaTallas.length === 0 || listaColores.length === 0) {
+  if (!marca || !modelo || (variantRows.length === 0 && (listaTallas.length === 0 || listaColores.length === 0))) {
     return res.status(400).json({ success: false, message: 'Faltan campos requeridos para crear producto' });
   }
 
   try {
     const creados = [];
-    const baseId = id.trim().toUpperCase();
-    await prisma.$transaction(async (tx) => {
-      for (const c of listaColores) {
-        for (const t of listaTallas) {
-          // ID Único: PRODBASE-COLOR-TALLA (Ej: PROD-MA-002-ROJ-38)
-          const colorSlug = c.substring(0,3).toUpperCase();
-          const finalId = `${baseId}-${colorSlug}-${t}`;
+    const variantsToCreate = variantRows.length > 0
+      ? variantRows
+      : listaColores.flatMap(c => listaTallas.map(t => ({ color: c, talla: t, stock: Number(stock) })));
 
-          await tx.productos.create({
-            data: {
-              id: String(finalId),
-              marca: String(marca),
-              modelo: String(modelo),
-              talla: String(t),
-              color: String(c),
-              categoria_id: categoria_id ? String(categoria_id) : null,
-              estilo_id: estilo_id ? String(estilo_id) : null,
-              precio: Number(precio),
-              stock: Number(stock)
-            }
-          });
-          creados.push(finalId);
-        }
+    await prisma.$transaction(async (tx) => {
+      for (const variant of variantsToCreate) {
+        const finalId = createVariantId(baseId, variant.color, variant.talla);
+        await tx.productos.create({
+          data: {
+            id: String(finalId),
+            marca: String(marca),
+            modelo: String(modelo),
+            talla: String(variant.talla),
+            color: String(variant.color),
+            categoria_id: categoria_id ? String(categoria_id) : null,
+            estilo_id: estilo_id ? String(estilo_id) : null,
+            precio: Number(precio),
+            stock: Number(variant.stock === undefined ? stock : variant.stock)
+          }
+        });
+        creados.push(finalId);
       }
     });
 
     res.json({ success: true, message: `Matriz creada: ${creados.length} variantes generadas.`, ids: creados });
   } catch (error) {
     console.error('[CREATE_PRODUCTO_BATCH_ERROR]:', error);
-    // Capturar errores específicos de Prisma para dar un mensaje más claro al usuario
     if (error.code === 'P2002') {
       return res.status(409).json({ 
         success: false, 
-        message: `Error: Algunos de estos registros ya existen (posible duplicidad de ID o talla).` 
+        message: 'Error: Algunos de estos registros ya existen (posible duplicidad de ID o talla).' 
       });
     }
     res.status(500).json({ success: false, message: 'Error al procesar el lote de productos.' });
@@ -893,19 +928,17 @@ async function createProducto(req, res) {
 // MEJORADO: Cuando se edita un producto existente y se agregan nuevas tallas,
 // crea registros nuevos para las tallas adicionales en lugar de fallar
 async function updateProducto(req, res) {
-  const { id, marca, modelo, talla, color, precio, stock, categoria_id, estilo_id } = req.body;
+  const { id, marca, modelo, talla, color, precio, stock, categoria_id, estilo_id, variantes } = req.body;
   if (!id) {
     return res.status(400).json({ success: false, message: 'ID requerido para actualizar producto' });
   }
 
   try {
-    // Obtener el producto actual
     const productoActual = await prisma.productos.findUnique({ where: { id: String(id) } });
     if (!productoActual) {
       return res.status(404).json({ success: false, message: 'Producto no encontrado' });
     }
 
-    // Datos a actualizar en el registro actual (campos simples)
     const data = {};
     if (marca) data.marca = String(marca);
     if (modelo) data.modelo = String(modelo);
@@ -914,68 +947,141 @@ async function updateProducto(req, res) {
     if (categoria_id !== undefined) data.categoria_id = categoria_id ? String(categoria_id) : null;
     if (estilo_id !== undefined) data.estilo_id = estilo_id ? String(estilo_id) : null;
 
-    // Procesar tallas nuevas si las hay
+    const variantRows = Array.isArray(variantes)
+      ? variantes.map(normalizeVariantInput).filter(Boolean)
+      : [];
+
     let mensajeExtra = '';
-    const tallasNuevas = [];
-    
-    if (talla) {
-      const listaTallasNuevas = String(talla || '').split(/[,\/\;]+/).map(s => s.trim()).filter(Boolean);
-      
-      // Obtener tallas existentes para marca+modelo+color
+    let tallasNuevas = [];
+    let variantesEliminadas = 0;
+
+    if (variantRows.length > 0) {
+      const groupMarca = String(marca || productoActual.marca);
+      const groupModelo = String(modelo || productoActual.modelo);
       const productosExistentes = await prisma.productos.findMany({
-        where: {
-          marca: String(marca || productoActual.marca),
-          modelo: String(modelo || productoActual.modelo),
-          color: String(color || productoActual.color || '')
-        },
-        select: { talla: true, id: true }
+        where: { marca: groupMarca, modelo: groupModelo },
+        select: { id: true }
       });
-      
-      const tallasExistentes = productosExistentes.map(p => p.talla);
-      const tallasFaltantes = listaTallasNuevas.filter(t => !tallasExistentes.includes(t));
-      
-      // Crear registros nuevos para tallas faltantes
-      if (tallasFaltantes.length > 0) {
-        const baseId = `${marca || productoActual.marca}-${color || productoActual.color || 'SIN'}`;
-        const colorSlug = (color || productoActual.color || 'SIN').substring(0,3).toUpperCase();
-        
-        for (const t of tallasFaltantes) {
-          const newId = `${baseId}-${colorSlug}-${t}`.substring(0, 50); // VarChar(50)
+      const existingIds = productosExistentes.map(p => p.id);
+      const incomingIds = variantRows.filter(v => v.id).map(v => String(v.id));
+      const idsToDelete = existingIds.filter(existingId => !incomingIds.includes(existingId));
+      const baseId = getVariantBaseId(String(id));
+
+      if (Object.keys(data).length > 0) {
+        await prisma.productos.updateMany({
+          where: { marca: groupMarca, modelo: groupModelo },
+          data
+        });
+      }
+
+      for (const variant of variantRows) {
+        if (variant.id && existingIds.includes(variant.id)) {
+          const updateData = {
+            talla: variant.talla,
+            color: variant.color,
+            stock: variant.stock
+          };
+          if (Object.keys(data).length > 0) {
+            updateData.marca = data.marca;
+            updateData.modelo = data.modelo;
+            if (data.precio !== undefined) updateData.precio = data.precio;
+            if (data.categoria_id !== undefined) updateData.categoria_id = data.categoria_id;
+            if (data.estilo_id !== undefined) updateData.estilo_id = data.estilo_id;
+          }
+          await prisma.productos.update({ where: { id: variant.id }, data: updateData });
+        } else {
+          const newId = createVariantId(baseId, variant.color, variant.talla);
           try {
             await prisma.productos.create({
               data: {
                 id: newId,
                 marca: String(marca || productoActual.marca),
                 modelo: String(modelo || productoActual.modelo),
-                talla: String(t),
-                color: String(color || productoActual.color || ''),
+                talla: String(variant.talla),
+                color: String(variant.color),
                 categoria_id: categoria_id ? String(categoria_id) : (productoActual.categoria_id || null),
                 estilo_id: estilo_id ? String(estilo_id) : (productoActual.estilo_id || null),
                 precio: Number(precio !== undefined ? precio : productoActual.precio),
-                stock: Number(stock !== undefined ? stock : productoActual.stock)
+                stock: Number(variant.stock)
               }
             });
-            tallasNuevas.push(t);
+            tallasNuevas.push(variant.talla);
           } catch (e) {
-            console.warn(`[WARN] No se pudo crear talla ${t}:`, e.message);
+            console.warn(`[WARN] No se pudo crear variante ${variant.color}-${variant.talla}:`, e.message);
           }
         }
       }
-      
-      if (tallasFaltantes.length > 0) {
-        mensajeExtra = ` + ${tallasFaltantes.length} talla(s) nueva(s)`;
+
+      if (idsToDelete.length > 0) {
+        await prisma.productos.deleteMany({ where: { id: { in: idsToDelete } } });
+        variantesEliminadas = idsToDelete.length;
+      }
+      mensajeExtra = [];
+      if (tallasNuevas.length > 0) {
+        mensajeExtra.push(`${tallasNuevas.length} variante(s) añadida(s)`);
+      }
+      if (variantesEliminadas > 0) {
+        mensajeExtra.push(`${variantesEliminadas} variante(s) eliminada(s)`);
+      }
+      mensajeExtra = mensajeExtra.length ? ` + ${mensajeExtra.join(', ')}` : '';
+    } else {
+      if (talla) {
+        const listaTallasNuevas = String(talla || '').split(/[,\/\;]+/).map(s => s.trim()).filter(Boolean);
+
+        const productosExistentes = await prisma.productos.findMany({
+          where: {
+            marca: String(marca || productoActual.marca),
+            modelo: String(modelo || productoActual.modelo),
+            color: String(color || productoActual.color || '')
+          },
+          select: { talla: true, id: true }
+        });
+
+        const tallasExistentes = productosExistentes.map(p => p.talla);
+        const tallasFaltantes = listaTallasNuevas.filter(t => !tallasExistentes.includes(t));
+
+        if (tallasFaltantes.length > 0) {
+          const baseId = `${marca || productoActual.marca}-${color || productoActual.color || 'SIN'}`;
+          const colorSlug = (color || productoActual.color || 'SIN').substring(0,3).toUpperCase();
+
+          for (const t of tallasFaltantes) {
+            const newId = `${baseId}-${colorSlug}-${t}`.substring(0, 50);
+            try {
+              await prisma.productos.create({
+                data: {
+                  id: newId,
+                  marca: String(marca || productoActual.marca),
+                  modelo: String(modelo || productoActual.modelo),
+                  talla: String(t),
+                  color: String(color || productoActual.color || ''),
+                  categoria_id: categoria_id ? String(categoria_id) : (productoActual.categoria_id || null),
+                  estilo_id: estilo_id ? String(estilo_id) : (productoActual.estilo_id || null),
+                  precio: Number(precio !== undefined ? precio : productoActual.precio),
+                  stock: Number(stock !== undefined ? stock : productoActual.stock)
+                }
+              });
+              tallasNuevas.push(t);
+            } catch (e) {
+              console.warn(`[WARN] No se pudo crear talla ${t}:`, e.message);
+            }
+          }
+        }
+
+        if (tallasFaltantes.length > 0) {
+          mensajeExtra = ` + ${tallasFaltantes.length} talla(s) nueva(s)`;
+        }
+      }
+
+      if (Object.keys(data).length > 0) {
+        await prisma.productos.update({ where: { id: String(id) }, data });
       }
     }
 
-    // Actualizar el registro principal
-    if (Object.keys(data).length > 0) {
-      await prisma.productos.update({ where: { id: String(id) }, data });
-    }
-    
     res.json({ 
       success: true, 
       message: `Producto actualizado${mensajeExtra}`,
-      tallasAgregadas: tallasNuevas
+      tallasAgregadas: tallasNuevas,
+      variantesEliminadas
     });
   } catch (error) {
     console.error('[UPDATE_PRODUCTO_ERROR]:', error);
