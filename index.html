@@ -42,6 +42,10 @@ body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; overflow-x:
 #mobile-bottom-nav a { display: inline-flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.25rem; }
 #mobile-bottom-nav a span { font-size: 0.75rem; }
 
+#sidebar-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.45); z-index: 40; transition: opacity 0.3s ease; }
+#mobile-back-button { display: inline-flex; align-items: center; justify-content: center; width: 2.5rem; height: 2.5rem; border-radius: 0.75rem; background-color: #dbeafe; color: #0369a1; border: none; }
+#mobile-back-button i { font-size: 0.95rem; }
+
 .success-message { animation: fadeOut 5s forwards; opacity: 1; }
 @keyframes fadeOut { 0% { opacity: 1; } 70% { opacity: 1; } 100% { opacity: 0; } }
 .logo-text { background: linear-gradient(135deg, #ffd700, #ff9d00); -webkit-background-clip: text; background-clip: text; color: transparent; font-weight: bold; }
@@ -215,14 +219,20 @@ body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; overflow-x:
 <i class="fas fa-user-shield"></i><span>Usuarios</span>
 </a>
 </nav>
-</nav>
 </div>
+<div id="sidebar-overlay" class="sidebar-overlay hidden"></div>
 
 <!-- Content Area -->
 <div class="flex-1 flex flex-col overflow-hidden">
 <header class="bg-white shadow">
 <div class="flex items-center justify-between py-4 px-6">
-<div class="flex items-center">
+<div class="flex items-center gap-3">
+    <button id="mobile-menu-toggle" class="md:hidden inline-flex items-center justify-center w-10 h-10 rounded-lg bg-blue-100 text-blue-700 hover:bg-blue-200 focus:outline-none focus:ring-2 focus:ring-blue-500" aria-label="Abrir menú">
+      <i class="fas fa-bars"></i>
+    </button>
+    <button id="mobile-back-button" class="hidden md:hidden inline-flex items-center justify-center w-10 h-10 rounded-lg bg-slate-100 text-slate-700 hover:bg-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-500" aria-label="Volver al dashboard">
+      <i class="fas fa-arrow-left"></i>
+    </button>
     <img id="header-logo" class="header-logo hidden sm:inline-block" src="images/calzado_nica_logo.png" alt="Calzado Nica">
     <h1 id="page-title" class="text-xl font-semibold text-gray-800">Dashboard</h1>
 </div>

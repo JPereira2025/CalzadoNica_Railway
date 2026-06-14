@@ -48,6 +48,10 @@ function setupEventListeners() {
         e.preventDefault();
         toggleMobileSidebar();
     });
+    $(document).on("click", "#sidebar-overlay", function(e) {
+        e.preventDefault();
+        closeMobileSidebar();
+    });
     $(document).on("click", "#mobile-back-button", function(e) {
         e.preventDefault();
         navigateTo('dashboard');

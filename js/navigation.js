@@ -111,11 +111,13 @@ function navigateTo(page, callback) {
 
 function toggleMobileSidebar() {
     $("#sidebar").toggleClass("sidebar-open");
+    $("#sidebar-overlay").toggleClass("hidden");
 }
 
 function closeMobileSidebar() {
     if (window.innerWidth < 768) {
         $("#sidebar").removeClass("sidebar-open");
+        $("#sidebar-overlay").addClass("hidden");
     }
 }
 
