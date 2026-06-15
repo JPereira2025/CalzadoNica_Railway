@@ -972,6 +972,12 @@ async function updateProducto(req, res) {
       const idsToDelete = existingIds.filter(existingId => !incomingIds.includes(existingId));
       const baseId = getVariantBaseId(String(id));
 
+      console.log('[UPDATE_PRODUCTO_DEBUG] Variantes recibidas:', {
+        totalVariantes: variantRows.length,
+        variantesConId: variantRows.filter(v => v.id).length,
+        variantes: variantRows
+      });
+
       if (Object.keys(data).length > 0) {
         await prisma.productos.updateMany({
           where: { marca: groupMarca, modelo: groupModelo },
@@ -980,7 +986,10 @@ async function updateProducto(req, res) {
       }
 
       for (const variant of variantRows) {
+        console.log('[VARIANTE_PROCESSING]', { id: variant.id, color: variant.color, talla: variant.talla, existe: variant.id && existingIds.includes(variant.id) });
+        
         if (variant.id && existingIds.includes(variant.id)) {
+          // UPDATE EXISTENTE
           const updateData = {
             talla: variant.talla,
             color: variant.color,
@@ -993,26 +1002,59 @@ async function updateProducto(req, res) {
             if (data.categoria_id !== undefined) updateData.categoria_id = data.categoria_id;
             if (data.estilo_id !== undefined) updateData.estilo_id = data.estilo_id;
           }
+          console.log('[UPDATE_VARIANTE]', variant.id);
           await prisma.productos.update({ where: { id: variant.id }, data: updateData });
         } else {
+          // CREAR NUEVA VARIANTE
           const newId = createVariantId(baseId, variant.color, variant.talla);
+          console.log('[CREATE_VARIANTE_INTENT]', { color: variant.color, talla: variant.talla, newId });
+          
           try {
-            await prisma.productos.create({
-              data: {
-                id: newId,
-                marca: String(marca || productoActual.marca),
-                modelo: String(modelo || productoActual.modelo),
-                talla: String(variant.talla),
-                color: String(variant.color),
-                categoria_id: categoria_id ? String(categoria_id) : (productoActual.categoria_id || null),
-                estilo_id: estilo_id ? String(estilo_id) : (productoActual.estilo_id || null),
-                precio: Number(precio !== undefined ? precio : productoActual.precio),
-                stock: Number(variant.stock)
-              }
-            });
+            // Verificar si el ID ya existe (por si acaso)
+            const idExists = await prisma.productos.findUnique({ where: { id: newId } });
+            if (idExists) {
+              console.warn(`[VARIANTE_ID_CONFLICT] ID ${newId} ya existe, intentando alternativa...`);
+              // Si el ID existe, intentar con un sufijo aleatorio
+              const alternativeId = `${newId.substring(0, 45)}-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+              console.log('[ALTERNATIVA_ID]', alternativeId);
+              
+              await prisma.productos.create({
+                data: {
+                  id: alternativeId,
+                  marca: String(marca || productoActual.marca),
+                  modelo: String(modelo || productoActual.modelo),
+                  talla: String(variant.talla),
+                  color: String(variant.color),
+                  categoria_id: categoria_id ? String(categoria_id) : (productoActual.categoria_id || null),
+                  estilo_id: estilo_id ? String(estilo_id) : (productoActual.estilo_id || null),
+                  precio: Number(precio !== undefined ? precio : productoActual.precio),
+                  stock: Number(variant.stock)
+                }
+              });
+            } else {
+              await prisma.productos.create({
+                data: {
+                  id: newId,
+                  marca: String(marca || productoActual.marca),
+                  modelo: String(modelo || productoActual.modelo),
+                  talla: String(variant.talla),
+                  color: String(variant.color),
+                  categoria_id: categoria_id ? String(categoria_id) : (productoActual.categoria_id || null),
+                  estilo_id: estilo_id ? String(estilo_id) : (productoActual.estilo_id || null),
+                  precio: Number(precio !== undefined ? precio : productoActual.precio),
+                  stock: Number(variant.stock)
+                }
+              });
+            }
+            
+            console.log('[CREATE_VARIANTE_OK]', newId);
             tallasNuevas.push(variant.talla);
           } catch (e) {
-            console.warn(`[WARN] No se pudo crear variante ${variant.color}-${variant.talla}:`, e.message);
+            console.error(`[ERROR_CREATE_VARIANTE] ${variant.color}-${variant.talla}:`, {
+              errorCode: e.code,
+              errorMessage: e.message,
+              errorMeta: e.meta
+            });
           }
         }
       }
