@@ -524,8 +524,12 @@ body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; overflow-x:
     <div id="producto-variantes-section" class="mt-6 p-4 border border-gray-200 rounded-lg bg-gray-50">
         <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4">
             <div>
-                <h4 class="text-lg font-semibold text-gray-800">Variantes</h4>
-                <p class="text-sm text-gray-500">Añade tallas, colores y stock por variante. Si la tabla está vacía, se usarán los campos estándar de color/talla/stock.</p>
+                <h4 class="text-lg font-semibold text-gray-800">Variantes de Color/Talla</h4>
+                <p class="text-sm text-gray-500">
+                    <strong>✓ Existentes</strong> = Variantes que ya están guardadas<br/>
+                    <strong>+ Nuevas</strong> = Variantes que acabas de agregar<br/>
+                    Todas las variantes pertenecen al mismo producto base (ej: PROD-JE-053)
+                </p>
             </div>
             <button type="button" id="btn-add-variant-row" class="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white py-2 px-4 rounded-lg transition-colors">
                 <i class="fas fa-plus"></i>Agregar variante
@@ -534,7 +538,8 @@ body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; overflow-x:
         <div class="overflow-x-auto">
             <table class="w-full table-auto border-collapse">
                 <thead>
-                    <tr class="bg-white text-left text-gray-600 border-b border-gray-200">
+                    <tr class="bg-gray-100 text-left text-gray-700 border-b border-gray-300 font-semibold">
+                        <th class="py-2 px-3 w-32">Estado</th>
                         <th class="py-2 px-3">Color</th>
                         <th class="py-2 px-3">Talla</th>
                         <th class="py-2 px-3">Stock</th>

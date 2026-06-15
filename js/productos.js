@@ -148,15 +148,27 @@ function renderProductoVariantRows(variantes = []) {
     $body.empty();
 
     const rows = Array.isArray(variantes) && variantes.length ? variantes : [{ color: '', talla: '', stock: '' }];
-    rows.forEach(variant => {
+    rows.forEach((variant, index) => {
         const rowId = variant.id ? variant.id : '';
         const color = String(variant.color || '').trim();
         const talla = String(variant.talla || '').trim();
         const stock = variant.stock !== undefined && variant.stock !== null ? Number(variant.stock) : '';
+        const isExisting = !!variant.id; // Si tiene ID, es existente
+        
+        // Indicador visual: verde para existentes, azul para nuevas
+        const rowBgClass = isExisting ? 'bg-green-50' : 'bg-blue-50';
+        const badgeHTML = isExisting 
+            ? '<span class="inline-block bg-green-200 text-green-800 px-2 py-1 rounded text-xs font-bold">✓ Existente</span>'
+            : '<span class="inline-block bg-blue-200 text-blue-800 px-2 py-1 rounded text-xs font-bold">+ Nueva</span>';
+        
         const html = `
-            <tr>
-                <td class="py-2 px-3 border-b border-gray-200">
+            <tr class="${rowBgClass}">
+                <td class="py-2 px-3 border-b border-gray-200 w-32">
                     <input type="hidden" class="variant-id" value="${rowId}">
+                    <div class="text-xs mb-1">${badgeHTML}</div>
+                    ${isExisting ? `<small class="text-gray-500 block">${rowId}</small>` : ''}
+                </td>
+                <td class="py-2 px-3 border-b border-gray-200">
                     <input type="text" class="variant-color w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500" value="${escapeHtml(color)}" placeholder="Negro / Azul">
                 </td>
                 <td class="py-2 px-3 border-b border-gray-200">
@@ -333,14 +345,38 @@ function handleProductoSubmit(e) {
 }
 
 /**
- * Renderiza una fila de producto
+ * Extrae el ID base de un producto variante
+ * Ejemplo: PROD-JE-053-CAF-38 → PROD-JE-053
+ */
+function getProductBaseId(productId) {
+    if (!productId) return '';
+    const parts = String(productId).trim().split('-');
+    // Si tiene 5 partes (PROD-XX-###-COL-TAL), retorna las primeras 3
+    if (parts.length >= 5) {
+        return parts.slice(0, 3).join('-');
+    }
+    return productId;
+}
+
+/**
+ * Renderiza una fila de producto mejorada con mejor agrupación visual
  */
 function renderProductoRow(producto) {
     const precioF = parseFloat(producto.precio || 0).toFixed(2);
     const displayStock = (producto.stock_total !== undefined) ? producto.stock_total : (producto.stock || 0);
+    const baseId = getProductBaseId(producto.id);
+    const isVariante = baseId !== producto.id;
+    
+    // Si es variante, mostrar más información de agrupación
+    const idDisplay = isVariante 
+        ? `<span title="Variante de ${baseId}"><strong>${baseId}</strong><br/><small style="color:#999;">${producto.id}</small></span>`
+        : `<strong>${producto.id}</strong>`;
+    
+    const rowClass = isVariante ? 'bg-blue-50' : '';
+    
     return `
-    <tr data-id="${producto.id}">
-        <td class="py-3 px-4">${producto.id}</td>
+    <tr data-id="${producto.id}" class="${rowClass}">
+        <td class="py-3 px-4">${idDisplay}</td>
         <td class="py-3 px-4">${producto.marca || ''}</td>
         <td class="py-3 px-4">${producto.modelo || ''}</td>
         <td class="py-3 px-4">${producto.talla || ''}</td>
