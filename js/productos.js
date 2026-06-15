@@ -177,19 +177,28 @@ function renderProductoVariantRows(variantes = []) {
 
 function collectProductoVariantRows() {
     const variants = [];
-    $('#producto-variantes-body tr').each(function() {
+    const incompleteRows = [];
+    
+    $('#producto-variantes-body tr').each(function(index) {
         const $row = $(this);
         const id = String($row.find('.variant-id').val() || '').trim();
         const color = String($row.find('.variant-color').val() || '').trim();
         const talla = String($row.find('.variant-talla').val() || '').trim();
         const stock = parseInt($row.find('.variant-stock').val(), 10);
 
+        // Si ambos están vacíos, saltamos (fila vacía)
         if (!color && !talla) {
             return;
         }
 
+        // Si falta color o talla, registramos como incompleta pero NO la descartamos del warning
         if (!color || !talla) {
-            return;
+            incompleteRows.push({
+                index: index + 1,
+                color: color || '(vacío)',
+                talla: talla || '(vacío)'
+            });
+            return; // No agregamos a variants pero advertimos después
         }
 
         variants.push({
@@ -199,6 +208,17 @@ function collectProductoVariantRows() {
             stock: Number.isNaN(stock) ? 0 : stock
         });
     });
+    
+    // Si hay filas incompletas, mostrar warning
+    if (incompleteRows.length > 0) {
+        const filas = incompleteRows.map(r => `Fila ${r.index}: Color="${r.color}" | Talla="${r.talla}"`).join('\n');
+        console.warn('[VARIANT_WARNING] Filas incompletas detectadas:\n' + filas);
+        showNotification(
+            `⚠️ Hay ${incompleteRows.length} variante(s) incompleta(s). Solo se guardarán las filas con color Y talla.\n\n${filas}`,
+            'warning'
+        );
+    }
+    
     return variants;
 }
 
@@ -218,7 +238,24 @@ function handleProductoSubmit(e) {
     e.preventDefault();
     if (!ensureAdminAction('guardar un producto')) return;
     const id = $('#producto-id-form').val();
+    
+    // Validar si hay filas en la tabla de variantes
+    const totalRows = $('#producto-variantes-body tr').length;
+    
+    // Recolectar variantes válidas (completas)
     const variants = collectProductoVariantRows();
+    
+    // Validar: si hay filas en la tabla pero NO hay variantes válidas, error
+    if (totalRows > 0 && variants.length === 0) {
+        showNotification(
+            '❌ Error: Tienes ' + totalRows + ' fila(s) en la tabla de variantes pero están incompletas.\n\n' +
+            'Cada variante debe tener Color Y Talla.\n' +
+            'Completa los campos o elimina las filas vacías antes de guardar.',
+            'error'
+        );
+        return;
+    }
+    
     const payload = {
         marca: $('#producto-marca').val(),
         modelo: $('#producto-modelo').val(),
@@ -244,7 +281,15 @@ function handleProductoSubmit(e) {
         payload.id = id;
     }
 
-    console.log("Enviando payload de producto:", payload);
+    // Logging detallado para diagnóstico
+    console.log("=== PRODUCTO SUBMIT ===");
+    console.log("📋 ID:", id || "(nuevo)");
+    console.log("📦 Variantes válidas:", variants.length);
+    if (variants.length > 0) {
+        console.table(variants);
+    }
+    console.log("📤 Payload completo:", payload);
+    console.log("=======================");
 
     apiCall('productos.php', method, payload).done(resp => {
         // Verificar si la respuesta indica éxito (no asumir que HTTP 200 = éxito)
