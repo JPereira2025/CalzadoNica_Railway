@@ -292,20 +292,42 @@ function handleProductoSubmit(e) {
     console.log("=======================");
 
     apiCall('productos.php', method, payload).done(resp => {
+        console.log("✅ RESPUESTA DEL SERVIDOR:", resp);
+        
         // Verificar si la respuesta indica éxito (no asumir que HTTP 200 = éxito)
         if (resp && resp.success === false) {
-            showNotification(resp.message || 'Error al guardar el producto', 'error');
+            const errorMsg = resp.message || 'Error al guardar el producto';
+            showNotification('❌ ' + errorMsg, 'error');
             console.error("[PRODUCTO_ERROR]", resp);
+            console.error("[DETALLES]", {
+                success: resp.success,
+                message: resp.message,
+                fullResponse: resp
+            });
             return;
         }
-        showNotification(resp.message || 'Producto guardado exitosamente', 'success');
+        
+        const successMsg = resp.message || 'Producto guardado exitosamente';
+        showNotification('✅ ' + successMsg, 'success');
+        console.log("📝 Detalles de éxito:", {
+            ids: resp.ids,
+            tallasAgregadas: resp.tallasAgregadas,
+            variantesEliminadas: resp.variantesEliminadas
+        });
         $('#modal-producto').fadeOut(200);
         loadProductos();
     }).fail(xhr => {
+        console.error("❌ FALLO EN LA SOLICITUD:", {
+            status: xhr.status,
+            statusText: xhr.statusText,
+            responseJSON: xhr.responseJSON,
+            responseText: xhr.responseText
+        });
+        
         if (xhr.responseJSON && xhr.responseJSON.message) {
-            showNotification(xhr.responseJSON.message, 'error');
+            showNotification('❌ ' + xhr.responseJSON.message, 'error');
         } else {
-            showNotification('Error desconocido al guardar el producto. Revisa la consola.', 'error');
+            showNotification('❌ Error desconocido al guardar. Revisa F12 → Console para detalles.', 'error');
         }
     });
 }
