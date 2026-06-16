@@ -133,14 +133,22 @@ async function deleteProductoImagen(req, res) {
     
     let img = null;
     try {
-      // Usar SQL directo siempre para garantizar que funcione
-      const rows = await prisma.$queryRawUnsafe('SELECT * FROM producto_imagenes WHERE id = ? LIMIT 1', Number(imgId));
-      img = (rows && rows.length) ? rows[0] : null;
+      if (prisma.producto_imagenes && typeof prisma.producto_imagenes.findUnique === 'function') {
+        img = await prisma.producto_imagenes.findUnique({ where: { id: imgId } });
+      } else {
+        const placeholder = process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgres') ? '$1' : '?';
+        const query = `SELECT * FROM producto_imagenes WHERE id = ${placeholder} LIMIT 1`;
+        const rows = await prisma.$queryRawUnsafe(query, imgId);
+        img = (rows && rows.length) ? rows[0] : null;
+      }
     } catch (e) {
       console.error('[IMG_QUERY_ERROR]:', e);
     }
     
-    if (!img) return res.status(404).json({ success: false, message: 'Imagen no encontrada' });
+    if (!img) {
+      console.warn(`[DELETE_IMG_NOT_FOUND] productoId=${productoId} imgId=${imgId}`);
+      return res.status(404).json({ success: false, message: 'Imagen no encontrada' });
+    }
     
     // Borrar fichero físico en la carpeta de subida persistente o en la ruta legacy de tienda/img
     try {
@@ -161,9 +169,14 @@ async function deleteProductoImagen(req, res) {
       console.warn(`[FS_WARN] Error al borrar archivo físico de ${imgId}:`, fsErr.message);
     }
     
-    // Eliminar registro de BD - usar SQL directo siempre
+    // Eliminar registro de BD
     try {
-      await prisma.$executeRawUnsafe('DELETE FROM producto_imagenes WHERE id = ?', Number(imgId));
+      if (prisma.producto_imagenes && typeof prisma.producto_imagenes.delete === 'function') {
+        await prisma.producto_imagenes.delete({ where: { id: imgId } });
+      } else {
+        const placeholder = process.env.DATABASE_URL && process.env.DATABASE_URL.startsWith('postgres') ? '$1' : '?';
+        await prisma.$executeRawUnsafe(`DELETE FROM producto_imagenes WHERE id = ${placeholder}`, imgId);
+      }
       console.log(`[DB] Imagen ${imgId} eliminada de BD`);
     } catch (delErr) {
       console.error('[DB_DELETE_ERROR]:', delErr);
